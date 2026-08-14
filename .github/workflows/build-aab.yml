@@ -62,18 +62,18 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: app/build/outputs/bundle/release/app-release.aab
-          asset_name: Stillzeit-v2.0.0-${{ github.run_number }}.aab
-          tag: v2.0.0-${{ github.run_number }}
+          asset_name: Stillzeit-v2.1.0-${{ github.run_number }}.aab
+          tag: v2.1.0-${{ github.run_number }}
           overwrite: true
-          body: "Stillzeit v2.0.0 (Lauf ${{ github.run_number }}) – signierte App Bundles für Handy und Wear OS"
+          body: "Stillzeit v2.1.0 (Lauf ${{ github.run_number }}) – signierte App Bundles für Handy und Wear OS"
 
       - name: Wear-AAB an dasselbe Release anhängen
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: wear/build/outputs/bundle/release/wear-release.aab
-          asset_name: Stillzeit-Wear-v2.0.0-${{ github.run_number }}.aab
-          tag: v2.0.0-${{ github.run_number }}
+          asset_name: Stillzeit-Wear-v2.1.0-${{ github.run_number }}.aab
+          tag: v2.1.0-${{ github.run_number }}
           overwrite: true
 
       # Handy- und Uhr-Bundle MÜSSEN in getrennten Schritten (= getrennten
