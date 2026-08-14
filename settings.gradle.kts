@@ -24,3 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Stillzeit-Tracker"
 include(":app")
+// Native Wear-OS-App (aus dem Flutter-Repo umgezogen). Wird als eigenes
+// Bundle gebaut und in Play ueber den Formfaktor-Track "wear:<track>"
+// verteilt – gleiche applicationId und gleicher Upload-Key wie :app.
+include(":wear")

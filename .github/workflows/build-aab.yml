@@ -46,12 +46,13 @@ jobs:
           keyPassword=$KEY_PW
           EOF
 
-      # versionCode = 100 + run_number: bleibt strikt monoton und liegt
-      # sicher über den bereits im Play Store verwendeten Codes (≤ 18).
-      - name: Signiertes App-Bundle bauen
-        run: ./gradlew :app:bundleRelease -PbuildNumber=$((100 + GITHUB_RUN_NUMBER))
+      # versionCode = 100 + run_number (Handy) bzw. + 1000 Versatz (Uhr):
+      # bleibt strikt monoton und liegt sicher über den bereits im Play Store
+      # verwendeten Codes (Handy ≤ 18, Wear ≤ 1017).
+      - name: Signierte App-Bundles bauen (Handy + Wear)
+        run: ./gradlew :app:bundleRelease :wear:bundleRelease -PbuildNumber=$((100 + GITHUB_RUN_NUMBER))
 
-      - name: AAB als GitHub-Release veröffentlichen
+      - name: Handy-AAB als GitHub-Release veröffentlichen
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -59,7 +60,16 @@ jobs:
           asset_name: Stillzeit-v2.0.0-${{ github.run_number }}.aab
           tag: v2.0.0-${{ github.run_number }}
           overwrite: true
-          body: "Stillzeit ${{ github.run_number }} – signiertes Android App Bundle (versionCode ${{ github.run_number }} + 100)"
+          body: "Stillzeit v2.0.0 (Lauf ${{ github.run_number }}) – signierte App Bundles für Handy und Wear OS"
+
+      - name: Wear-AAB an dasselbe Release anhängen
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: wear/build/outputs/bundle/release/wear-release.aab
+          asset_name: Stillzeit-Wear-v2.0.0-${{ github.run_number }}.aab
+          tag: v2.0.0-${{ github.run_number }}
+          overwrite: true
 
       - name: Keystore aufräumen
         if: always()

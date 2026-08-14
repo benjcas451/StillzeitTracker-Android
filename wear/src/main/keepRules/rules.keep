@@ -1,0 +1,13 @@
+# R8-Regeln für das Wear-OS-Modul – bewusst leer:
+#
+# - `MainActivity` ist im Manifest deklariert und wird von AGP automatisch
+#   gehalten; weitere Einstiegspunkte gibt es nicht.
+# - Die Data-Layer-API wird über direkte Aufrufe angesprochen
+#   (`Wearable.getCapabilityClient`, `getMessageClient`), nicht über eine im
+#   Manifest registrierte `WearableListenerService`.
+# - `play-services-wearable` liefert seine Regeln als Consumer-Rules im AAR.
+# - Das JSON-Mapping arbeitet mit literalen String-Keys über `org.json`,
+#   keine per Reflection befüllten Datenklassen.
+#
+# Falls künftig Reflection dazukommt (kotlinx.serialization, Gson, …),
+# gehören die Keep-Rules genau hierher.

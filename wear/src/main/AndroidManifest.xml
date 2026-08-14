@@ -1,0 +1,37 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch"/>
+
+    <!-- Nötig, sobald die Uhr die Server-Verbindung des Handys übernommen hat
+         und die REST-API selbst anspricht. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/StillzeitWearTheme">
+
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="false"/>
+
+        <!-- Die Uhr-App hat keine eigene Datenquelle: Lesen und Schreiben laufen
+             über die Handy-App. Damit ist sie ausdrücklich nicht standalone. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="false"/>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/StillzeitWearTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
