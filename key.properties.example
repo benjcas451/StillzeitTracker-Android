@@ -1,0 +1,10 @@
+# Vorlage – kopiere diese Datei nach android/key.properties und trage deine
+# echten Werte ein. key.properties ist in .gitignore und darf NIE ins Repo.
+#
+# storeFile: Pfad zum Keystore. Absoluter Pfad ist am einfachsten, z. B.
+#   /Users/lucas/keys/stillzeit-upload.jks
+
+storePassword=DEIN_STORE_PASSWORT
+keyPassword=DEIN_KEY_PASSWORT
+keyAlias=upload
+storeFile=/ABSOLUTER/PFAD/zu/stillzeit-upload.jks

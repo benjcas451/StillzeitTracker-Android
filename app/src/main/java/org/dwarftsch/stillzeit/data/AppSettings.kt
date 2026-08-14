@@ -1,0 +1,91 @@
+package org.dwarftsch.stillzeit.data
+
+import android.content.Context
+import android.content.SharedPreferences
+
+/** Welche Datenquelle die App verwendet. Namen identisch zur Flutter-App. */
+enum class DataSourceMode(val gespeichert: String) {
+    /** Die mTLS-Server-API. */
+    API("api"),
+
+    /** Server-API mit API-Key (X-API-Key-Header) statt Client-Zertifikat. */
+    API_KEY("apiKey"),
+
+    /** Immer die lokale SQLite-Datenbank. */
+    DEMO("demo");
+
+    companion object {
+        fun fromGespeichert(value: String?): DataSourceMode =
+            entries.firstOrNull { it.gespeichert == value } ?: DEMO
+    }
+}
+
+/**
+ * Lädt und speichert App-Einstellungen (SharedPreferences).
+ *
+ * Beim ersten Start nach dem Umstieg von der Flutter-App werden die dort
+ * hinterlegten Werte übernommen: Flutters shared_preferences-Plugin speichert
+ * unter `FlutterSharedPreferences` mit dem Präfix `flutter.`. Die Schlüssel-
+ * namen selbst sind identisch geblieben.
+ */
+class AppSettings(context: Context) {
+
+    private val prefs: SharedPreferences =
+        context.applicationContext.getSharedPreferences("stillzeit_settings", Context.MODE_PRIVATE)
+
+    init {
+        migriereVonFlutter(context.applicationContext)
+    }
+
+    var mode: DataSourceMode
+        get() = DataSourceMode.fromGespeichert(prefs.getString(KEY_MODE, null))
+        set(value) = prefs.edit().putString(KEY_MODE, value.gespeichert).apply()
+
+    var apiKey: String
+        get() = prefs.getString(KEY_API_KEY, "").orEmpty()
+        set(value) = prefs.edit().putString(KEY_API_KEY, value.trim()).apply()
+
+    /** Basis-URL der mTLS-API; leer, solange keine hinterlegt ist. */
+    var apiBaseUrl: String
+        get() = ladeUrl(KEY_API_BASE_URL)
+        set(value) = prefs.edit().putString(KEY_API_BASE_URL, value.trim()).apply()
+
+    /** Basis-URL der API-Key-API; leer, solange keine hinterlegt ist. */
+    var apiKeyBaseUrl: String
+        get() = ladeUrl(KEY_API_KEY_BASE_URL)
+        set(value) = prefs.edit().putString(KEY_API_KEY_BASE_URL, value.trim()).apply()
+
+    /** SAF-Ordner-URI der Zertifikate; null, solange keiner gewählt wurde. */
+    var certFolderUri: String?
+        get() = prefs.getString(KEY_CERT_FOLDER_URI, null)
+        set(value) = prefs.edit().putString(KEY_CERT_FOLDER_URI, value).apply()
+
+    private fun ladeUrl(key: String): String {
+        val url = prefs.getString(key, "").orEmpty().trim()
+        if (url.isEmpty()) return ""
+        return if (url.endsWith("/")) url else "$url/"
+    }
+
+    private fun migriereVonFlutter(context: Context) {
+        if (prefs.getBoolean(KEY_MIGRIERT, false)) return
+
+        val flutter = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        for (key in listOf(KEY_MODE, KEY_API_KEY, KEY_API_BASE_URL, KEY_API_KEY_BASE_URL, KEY_CERT_FOLDER_URI)) {
+            val wert = flutter.getString("flutter.$key", null)
+            if (wert != null && !prefs.contains(key)) {
+                editor.putString(key, wert)
+            }
+        }
+        editor.putBoolean(KEY_MIGRIERT, true).apply()
+    }
+
+    private companion object {
+        const val KEY_MODE = "data_source_mode"
+        const val KEY_API_KEY = "api_key"
+        const val KEY_API_BASE_URL = "api_base_url"
+        const val KEY_API_KEY_BASE_URL = "api_key_base_url"
+        const val KEY_CERT_FOLDER_URI = "cert_folder_uri"
+        const val KEY_MIGRIERT = "migriert_von_flutter"
+    }
+}

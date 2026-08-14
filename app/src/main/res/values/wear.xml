@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Über diese Capability findet die Wear-OS-App das Handy mit der
+         Stillzeit-App. Der Name muss mit `PhoneConnection.PHONE_CAPABILITY`
+         im :wear-Modul übereinstimmen. -->
+    <string-array name="android_wear_capabilities">
+        <item>stillzeit_phone_app</item>
+    </string-array>
+</resources>
