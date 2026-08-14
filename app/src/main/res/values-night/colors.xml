@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Seitenhintergrund im Darkmode (Grau-900, kein reines Schwarz). -->
+    <color name="fenster_hintergrund">#1F2221</color>
+</resources>
