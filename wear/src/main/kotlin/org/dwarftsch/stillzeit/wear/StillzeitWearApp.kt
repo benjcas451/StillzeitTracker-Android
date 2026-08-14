@@ -26,6 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -43,40 +46,93 @@ import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
+import androidx.wear.compose.material.Typography
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
 import androidx.wear.compose.material.rememberPickerState
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-// --- Farben (identisch zur Flutter-App) --------------------------------------
+// --- Design-System „Minze & Honig" (v1.0, Dark-Regeln aus Guide 2.8) ---------
+// Pastelltöne (300) dienen auf dunklem Grund direkt als Akzent; Buttons
+// tragen Füllung 300 mit 900er-Text. Zarte Flächen sind die abgedunkelten
+// 100er-Äquivalente. Zuordnung wie auf dem Telefon: Links=Minze,
+// Rechts=Flieder, Beidseitig=Grau, Flasche=Honig.
 
-private val LinksFarbe = Color(0xFF3182CE)
-private val RechtsFarbe = Color(0xFF805AD5)
-private val BeidseitigFarbe = Color(0xFF319795)
-private val FlascheFarbe = Color(0xFFDD6B20)
+private val Minze300 = Color(0xFFA8D5BA)
+private val Minze900 = Color(0xFF22392C)
+private val MinzeDunkel = Color(0xFF263B2F)
+private val Honig300 = Color(0xFFF7E8A4)
+private val Honig900 = Color(0xFF473A17)
+private val HonigDunkel = Color(0xFF3B3524)
+private val Flieder300 = Color(0xFFCDB4DB)
+private val Flieder900 = Color(0xFF37263F)
+private val FliederDunkel = Color(0xFF352B3C)
+private val Grau300 = Color(0xFFC6CDC9)
+private val GrauRand = Color(0xFF3A403C)
+private val GrauFlaeche = Color(0xFF2E332F)
+private val Rot300 = Color(0xFFF0B6B1)
+private val Grund = Color(0xFF1F2221)
+private val Karte = Color(0xFF292D2B)
+private val TextHell = Color(0xFFECEFED)
+private val TextSekundaer = Color(0xFFA9B0AB)
 
 private val StillzeitFarben = Colors(
-    primary = FlascheFarbe,
-    primaryVariant = Color(0xFFB45309),
-    secondary = BeidseitigFarbe,
-    secondaryVariant = Color(0xFF1F6F6F),
-    background = Color.Black,
-    surface = Color(0xFF1F1D1B),
-    error = Color(0xFFCF6679),
-    onPrimary = Color.Black,
-    onSecondary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White,
-    onSurfaceVariant = Color(0xFFBFBFBF),
-    onError = Color.Black,
+    primary = Minze300,
+    primaryVariant = Color(0xFF82BD9B),
+    secondary = Honig300,
+    secondaryVariant = Color(0xFFEDD374),
+    background = Grund,
+    surface = Karte,
+    error = Rot300,
+    onPrimary = Minze900,
+    onSecondary = Honig900,
+    onBackground = TextHell,
+    onSurface = TextHell,
+    onSurfaceVariant = TextSekundaer,
+    onError = Color(0xFF4A211E),
 )
 
-private fun farbeFuer(seite: String): Color = when (seite) {
-    Seite.LINKS -> LinksFarbe
-    Seite.RECHTS -> RechtsFarbe
-    Seite.BEIDSEITIG -> BeidseitigFarbe
-    else -> FlascheFarbe
+/** Nunito – Persönlichkeit über das Gewicht (Guide Abschnitt 3). */
+private val Nunito = FontFamily(
+    Font(R.font.nunito_regular, FontWeight.Normal),
+    Font(R.font.nunito_semibold, FontWeight.SemiBold),
+    Font(R.font.nunito_bold, FontWeight.Bold),
+    Font(R.font.nunito_extrabold, FontWeight.ExtraBold),
+)
+
+private val StillzeitTypografie = Typography(defaultFontFamily = Nunito)
+
+/** Kräftige Fläche (300) für die Schnell-Eingabe-Kacheln. */
+private fun kachelFlaeche(seite: String): Color = when (seite) {
+    Seite.LINKS -> Minze300
+    Seite.RECHTS -> Flieder300
+    Seite.BEIDSEITIG -> GrauRand
+    else -> Honig300
+}
+
+/** Text/Icon auf der 300er-Fläche (900). */
+private fun kachelInhalt(seite: String): Color = when (seite) {
+    Seite.LINKS -> Minze900
+    Seite.RECHTS -> Flieder900
+    Seite.BEIDSEITIG -> TextHell
+    else -> Honig900
+}
+
+/** Zarte, abgedunkelte Fläche für Karten-Akzente. */
+private fun zarteFlaeche(seite: String): Color = when (seite) {
+    Seite.LINKS -> MinzeDunkel
+    Seite.RECHTS -> FliederDunkel
+    Seite.BEIDSEITIG -> GrauFlaeche
+    else -> HonigDunkel
+}
+
+/** Icon-/Akzentfarbe auf dunklem Grund (300er-Stufe). */
+private fun akzent(seite: String): Color = when (seite) {
+    Seite.LINKS -> Minze300
+    Seite.RECHTS -> Flieder300
+    Seite.BEIDSEITIG -> Grau300
+    else -> Honig300
 }
 
 private fun iconFuer(seite: String): Int = when (seite) {
@@ -103,7 +159,7 @@ fun StillzeitWearApp(model: WatchModel) {
     var ansicht by remember { mutableStateOf<Ansicht>(Ansicht.Liste) }
     var gewaehlteZeit by remember { mutableStateOf<LocalTime?>(null) }
 
-    MaterialTheme(colors = StillzeitFarben) {
+    MaterialTheme(colors = StillzeitFarben, typography = StillzeitTypografie) {
         // Auf der Uhr löst die Wischgeste nach rechts den Zurück-Befehl aus.
         BackHandler(enabled = ansicht != Ansicht.Liste) { ansicht = Ansicht.Liste }
 
@@ -314,12 +370,12 @@ private fun ListenAnsicht(
 
 @Composable
 private fun LetzterEintragKarte(eintrag: WatchEntry?) {
-    val farbe = if (eintrag == null) Color.DarkGray else farbeFuer(eintrag.seite)
+    val flaeche = if (eintrag == null) GrauFlaeche else zarteFlaeche(eintrag.seite)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(farbe.copy(alpha = 0.18f))
+            .clip(RoundedCornerShape(16.dp))
+            .background(flaeche)
             .padding(vertical = 8.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -339,7 +395,7 @@ private fun LetzterEintragKarte(eintrag: WatchEntry?) {
             Icon(
                 painter = painterResource(iconFuer(eintrag.seite)),
                 contentDescription = null,
-                tint = farbe,
+                tint = akzent(eintrag.seite),
                 modifier = Modifier.size(18.dp),
             )
             Text(
@@ -384,13 +440,14 @@ private fun RowScope.AuswahlKachel(
     aktiv: Boolean,
     onClick: () -> Unit,
 ) {
-    val farbe = if (aktiv) FlascheFarbe else Color.Gray
+    val flaeche = if (aktiv) Minze300 else Karte
+    val inhalt = if (aktiv) Minze900 else TextSekundaer
     Row(
         modifier = Modifier
             .weight(1f)
             .heightIn(min = 28.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(farbe.copy(alpha = 0.24f))
+            .background(flaeche)
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.Center,
@@ -399,12 +456,13 @@ private fun RowScope.AuswahlKachel(
         Icon(
             painter = painterResource(icon),
             contentDescription = null,
-            tint = farbe,
+            tint = inhalt,
             modifier = Modifier.size(14.dp),
         )
         Text(
             text = " $text",
             style = MaterialTheme.typography.caption1,
+            color = inhalt,
             maxLines = 1,
         )
     }
@@ -429,13 +487,12 @@ private fun SchnellEingabe(onSchnellEingabe: (String) -> Unit) {
 
 @Composable
 private fun RowScope.AktionsKachel(seite: String, onClick: (String) -> Unit) {
-    val farbe = farbeFuer(seite)
     Column(
         modifier = Modifier
             .weight(1f)
             .heightIn(min = 50.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(farbe.copy(alpha = 0.24f))
+            .background(kachelFlaeche(seite))
             .clickable { onClick(seite) }
             .padding(vertical = 5.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -444,12 +501,14 @@ private fun RowScope.AktionsKachel(seite: String, onClick: (String) -> Unit) {
         Icon(
             painter = painterResource(iconFuer(seite)),
             contentDescription = null,
-            tint = farbe,
+            tint = kachelInhalt(seite),
             modifier = Modifier.size(20.dp),
         )
         Text(
             text = seite,
             style = MaterialTheme.typography.caption2,
+            color = kachelInhalt(seite),
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
             textAlign = TextAlign.Center,
         )
@@ -469,7 +528,7 @@ private fun Verbindungshinweis(
         Text(
             text = meldung,
             style = MaterialTheme.typography.caption1,
-            color = FlascheFarbe,
+            color = MaterialTheme.colors.error,
             textAlign = TextAlign.Center,
         )
         CompactChip(
@@ -483,7 +542,7 @@ private fun Verbindungshinweis(
 
 @Composable
 private fun EintragsZeile(eintrag: WatchEntry, onClick: () -> Unit) {
-    val farbe = farbeFuer(eintrag.seite)
+    val farbe = akzent(eintrag.seite)
     Chip(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -557,7 +616,7 @@ private fun VerbindungsAnsicht(model: WatchModel, onFertig: () -> Unit) {
                 Text(
                     text = model.statusText,
                     style = MaterialTheme.typography.body2,
-                    color = if (verbunden) FlascheFarbe else MaterialTheme.colors.onSurfaceVariant,
+                    color = if (verbunden) Minze300 else MaterialTheme.colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
@@ -595,7 +654,7 @@ private fun VerbindungsAnsicht(model: WatchModel, onFertig: () -> Unit) {
                     Text(
                         text = meldung,
                         style = MaterialTheme.typography.caption1,
-                        color = FlascheFarbe,
+                        color = MaterialTheme.colors.error,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
@@ -607,7 +666,7 @@ private fun VerbindungsAnsicht(model: WatchModel, onFertig: () -> Unit) {
                     onClick = model::verbindungImportieren,
                     enabled = !model.laedt,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ChipDefaults.primaryChipColors(backgroundColor = FlascheFarbe),
+                    colors = ChipDefaults.primaryChipColors(),
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_importieren),
@@ -781,7 +840,7 @@ private fun AuswahlGeruest(
             CompactChip(
                 onClick = onSpeichern,
                 label = { Text(speichernText, maxLines = 1) },
-                colors = ChipDefaults.primaryChipColors(backgroundColor = FlascheFarbe),
+                colors = ChipDefaults.primaryChipColors(),
             )
         }
     }
