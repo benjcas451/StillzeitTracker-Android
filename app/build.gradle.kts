@@ -30,10 +30,11 @@ android {
         minSdk = 24
         targetSdk = 37
         // Muss beim Play-Upload strikt ueber dem letzten veroeffentlichten
-        // versionCode der Flutter-App liegen (dort: github.run_number, zuletzt
-        // 17). Fuer eine CI spaeter analog per Property uebersteuern.
-        versionCode = 18
-        versionName = "2.0"
+        // versionCode der Flutter-App liegen (zuletzt 17). Die CI uebergibt
+        // -PbuildNumber=100+run_number (siehe .github/workflows/build-aab.yml),
+        // lokal gilt der Fallback.
+        versionCode = (findProperty("buildNumber") as String?)?.toIntOrNull() ?: 18
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
