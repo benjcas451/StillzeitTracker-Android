@@ -2,6 +2,11 @@ name: Android App Bundle (Release)
 
 on:
   workflow_dispatch:
+    inputs:
+      play_upload:
+        description: "Bundles zusätzlich in die Play-Tracks hochladen (alpha / wear:Alpha)"
+        type: boolean
+        default: true
 
 jobs:
   build-aab:
@@ -70,6 +75,31 @@ jobs:
           asset_name: Stillzeit-Wear-v2.0.0-${{ github.run_number }}.aab
           tag: v2.0.0-${{ github.run_number }}
           overwrite: true
+
+      # Handy- und Uhr-Bundle MÜSSEN in getrennten Schritten (= getrennten
+      # Play-Edits) hochgeladen werden: Play verlangt für Wear OS einen
+      # eigenen Formfaktor-Track, ein Wear-Bundle im Mobile-Track lässt sich
+      # nicht committen ("Internal error encountered"). Der Track-Name ist
+      # case-sensitiv: der Closed-Testing-Track heißt in der Console "Alpha".
+      - name: Handy-AAB in Play hochladen (alpha)
+        if: ${{ inputs.play_upload }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.dwarftsch.stillzeit
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          tracks: alpha
+          status: completed
+
+      - name: Wear-AAB in Play hochladen (wear:Alpha)
+        if: ${{ inputs.play_upload }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.dwarftsch.stillzeit
+          releaseFiles: wear/build/outputs/bundle/release/wear-release.aab
+          tracks: "wear:Alpha"
+          status: completed
 
       - name: Keystore aufräumen
         if: always()
