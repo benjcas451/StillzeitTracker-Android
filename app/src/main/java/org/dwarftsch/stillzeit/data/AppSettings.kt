@@ -60,19 +60,28 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_CERT_FOLDER_URI, null)
         set(value) = prefs.edit().putString(KEY_CERT_FOLDER_URI, value).apply()
 
-    /** Demo-Modus: lokale Entsprechung der Server-Option „Brei & Wasser“. */
-    var breiWasserDemoAktiv: Boolean
-        get() = prefs.getBoolean(KEY_BREI_WASSER_DEMO, false)
-        set(value) = prefs.edit().putBoolean(KEY_BREI_WASSER_DEMO, value).apply()
+    /**
+     * Lokales Opt-in für Brei & Wasser (Default aus). Erst wenn es der
+     * Nutzer hier aktiviert, zeigt die App die beiden Erfassungs-Buttons –
+     * in den Server-Modi zusätzlich nur, wenn auch die Server-Option der
+     * Familie aktiv ist.
+     */
+    var breiWasserAktiviert: Boolean
+        get() = prefs.getBoolean(KEY_BREI_WASSER_AKTIVIERT, false)
+        set(value) = prefs.edit().putBoolean(KEY_BREI_WASSER_AKTIVIERT, value).apply()
 
     /**
-     * Zuletzt vom Server gemeldeter Stand der Option „Brei & Wasser“ –
-     * pro Zugang (Modus + Basis-URL) gehalten, weil die Option je Familie
-     * geschaltet wird. Im Demo-Modus gilt stattdessen [breiWasserDemoAktiv].
+     * Effektive Sichtbarkeit für den aktuellen Zugang: lokales Opt-in UND
+     * (im Server-Modus) der zuletzt gemeldete Stand der Server-Option –
+     * pro Zugang (Modus + Basis-URL) gecacht, weil sie je Familie geschaltet
+     * wird. Im Demo-Modus genügt das Opt-in.
      */
-    fun breiWasserAktivFuerAktuellenZugang(): Boolean = when (mode) {
-        DataSourceMode.DEMO -> breiWasserDemoAktiv
-        else -> prefs.getBoolean(breiWasserCacheKey(), false)
+    fun breiWasserAktivFuerAktuellenZugang(): Boolean {
+        if (!breiWasserAktiviert) return false
+        return when (mode) {
+            DataSourceMode.DEMO -> true
+            else -> prefs.getBoolean(breiWasserCacheKey(), false)
+        }
     }
 
     /** Cache nach erfolgreichem `?action=heute` aktualisieren (nicht im Demo). */
@@ -117,7 +126,7 @@ class AppSettings(context: Context) {
         const val KEY_API_KEY_BASE_URL = "api_key_base_url"
         const val KEY_CERT_FOLDER_URI = "cert_folder_uri"
         const val KEY_MIGRIERT = "migriert_von_flutter"
-        const val KEY_BREI_WASSER_DEMO = "brei_wasser_demo_aktiv"
+        const val KEY_BREI_WASSER_AKTIVIERT = "brei_wasser_aktiviert"
         const val KEY_BREI_WASSER_AKTIV = "brei_wasser_aktiv"
     }
 }

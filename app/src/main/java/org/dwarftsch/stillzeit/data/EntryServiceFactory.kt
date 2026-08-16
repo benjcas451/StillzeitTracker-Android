@@ -19,5 +19,5 @@ fun createConfiguredEntryService(context: Context, settings: AppSettings, certSo
             baseUrl = settings.apiKeyBaseUrl,
             apiKey = settings.apiKey,
         )
-        DataSourceMode.DEMO -> DemoService(context) { settings.breiWasserDemoAktiv }
+        DataSourceMode.DEMO -> DemoService(context) { settings.breiWasserAktiviert }
     }

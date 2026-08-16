@@ -35,7 +35,7 @@ data class EntryRow(
  */
 class DemoService(
     context: Context,
-    /** Lokale Entsprechung der Server-Option „Brei & Wasser“ (Demo-Toggle). */
+    /** Lokales Opt-in „Brei & Wasser“ (im Demo gibt es keine Server-Option). */
     private val breiWasserAktiv: () -> Boolean = { false },
 ) : EntryService {
 

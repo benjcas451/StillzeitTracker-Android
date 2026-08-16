@@ -179,17 +179,20 @@ class WearRequestService : WearableListenerService() {
     }
 
     /**
-     * Stand der Server-Option für die Uhr: im Demo-Modus der lokale Toggle,
-     * sonst frisch vom Server (und dabei den Telefon-Cache aktualisieren);
-     * schlägt die Abfrage fehl, gilt der letzte bekannte Wert.
+     * Sichtbarkeit für die Uhr: lokales Opt-in des Telefons UND (in den
+     * Server-Modi) die Server-Option – frisch vom Server geholt und dabei
+     * der Telefon-Cache aktualisiert; schlägt die Abfrage fehl, gilt der
+     * letzte bekannte Wert.
      */
-    private suspend fun breiWasserAktiv(service: EntryService, settings: AppSettings): Boolean =
-        when (settings.mode) {
-            DataSourceMode.DEMO -> settings.breiWasserDemoAktiv
+    private suspend fun breiWasserAktiv(service: EntryService, settings: AppSettings): Boolean {
+        if (!settings.breiWasserAktiviert) return false
+        return when (settings.mode) {
+            DataSourceMode.DEMO -> true
             else -> runCatching { service.getToday().breiWasserAktiv }
                 .onSuccess { settings.merkeBreiWasserAktiv(it) }
                 .getOrElse { settings.breiWasserAktivFuerAktuellenZugang() }
         }
+    }
 
     private fun alsJson(entry: Entry): JSONObject = JSONObject().apply {
         put("id", entry.id)

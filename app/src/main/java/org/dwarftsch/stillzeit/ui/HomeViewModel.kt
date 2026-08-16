@@ -100,11 +100,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }.fold(
                 onSuccess = { (stats, eintraege) ->
                     settings.merkeBreiWasserAktiv(stats.breiWasserAktiv)
+                    // Sichtbar nur, wenn auch das lokale Opt-in aktiv ist –
+                    // die Server-Option allein blendet nichts ein.
+                    val sichtbar = stats.breiWasserAktiv && settings.breiWasserAktiviert
                     state.value = state.value.copy(
                         laedt = false,
-                        stats = stats,
+                        stats = stats.copy(breiWasserAktiv = sichtbar),
                         eintraege = eintraege,
-                        breiWasserAktiv = stats.breiWasserAktiv,
+                        breiWasserAktiv = sichtbar,
                     )
                 },
                 onFailure = { fehler ->
