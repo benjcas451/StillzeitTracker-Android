@@ -45,6 +45,7 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -91,22 +92,24 @@ Endpunkte:
   {"seite": "Links", "dauer_minuten": 12}
   {"seite": "Links"}
   {"seite": "Flasche", "menge": 120, "flaschen_art": "Pre"}
+  {"seite": "Brei", "menge": 90} bzw. {"seite": "Wasser", "menge": 30}
   Optional "create_time" als ISO 8601 mit Zeitzonen-Offset, z. B. 2026-06-10T14:30:00+02:00
 
 • PATCH <Basis-URL>?id=42
   Flasche ändern: {"menge": 150, "flaschen_art": "Mutter"}
+  Brei/Wasser ändern: {"menge": 120}
   Stilldauer ändern: {"dauer_minuten": 15}
 
 • DELETE <Basis-URL>?id=42
   Eintrag löschen
 
-Gültige Werte für "seite": Links, Rechts, Beidseitig, Flasche.
+Gültige Werte für "seite": Links, Rechts, Beidseitig, Flasche sowie – wenn die Server-Option "Brei & Wasser" der Familie aktiv ist (?action=heute liefert "brei_wasser_aktiv") – Brei und Wasser.
 
 Authentifizierung je nach Datenquelle:
 • Server (mTLS-API): Client-Zertifikat (client.crt + client.key)
 • Server (API-Key): HTTP-Header "X-API-Key: <Key>"
 
-Ein Eintrag hat die Felder id, create_time, seite, menge (Menge in ml, nur bei Flasche), flaschen_art (Pre oder Mutter, nur bei Flasche) und dauer_minuten (optionale Stilldauer in Minuten, nur bei Links/Rechts/Beidseitig). Fehler kommen als {"error": "..."} mit passendem HTTP-Statuscode.
+Ein Eintrag hat die Felder id, create_time, seite, menge (bei Flasche/Wasser in ml, bei Brei in g), einheit ("ml", "g" oder null), flaschen_art (Pre oder Mutter, nur bei Flasche) und dauer_minuten (optionale Stilldauer in Minuten, nur bei Links/Rechts/Beidseitig). Fehler kommen als {"error": "..."} mit passendem HTTP-Statuscode.
 """
 
 /** Beschreibung der lokalen SQLite-Datenbank (für den Dialog "Aufbau Datenbank"). */
@@ -122,10 +125,10 @@ Tabelle "entries":
   TEXT, Zeitpunkt als ISO 8601 in UTC gespeichert (dadurch chronologisch sortierbar), Anzeige in lokaler Zeit
 
 • seite
-  TEXT: Links, Rechts, Beidseitig oder Flasche
+  TEXT: Links, Rechts, Beidseitig, Flasche, Brei oder Wasser
 
 • menge
-  INTEGER, Menge in ml – nur bei Flasche gesetzt, sonst NULL
+  INTEGER, Menge (Flasche/Wasser in ml, Brei in g) – sonst NULL
 
 • flaschen_art
   TEXT, Pre oder Mutter – nur bei Flasche gesetzt, bei älteren Einträgen ggf. NULL
@@ -355,6 +358,32 @@ fun SettingsScreen(
             }
 
             if (mode == DataSourceMode.DEMO) {
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Abschnitt("Brei & Wasser")
+                // Lokale Entsprechung der Server-Option: schaltet die beiden
+                // Erfassungs-Buttons im Demo-Modus frei.
+                var breiWasserDemo by remember { mutableStateOf(settings.breiWasserDemoAktiv) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Brei & Wasser erfassen")
+                        Text(
+                            "Zusätzliche Buttons für Brei (g) und Wasser (ml).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = breiWasserDemo,
+                        onCheckedChange = {
+                            breiWasserDemo = it
+                            settings.breiWasserDemoAktiv = it
+                        },
+                    )
+                }
+
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Abschnitt("Backup")
                 Button(

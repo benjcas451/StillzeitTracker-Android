@@ -63,6 +63,7 @@ private val Minze300 = Color(0xFFA8D5BA)
 private val Minze900 = Color(0xFF22392C)
 private val MinzeDunkel = Color(0xFF263B2F)
 private val Honig300 = Color(0xFFF7E8A4)
+private val Honig400 = Color(0xFFEDD374)
 private val Honig900 = Color(0xFF473A17)
 private val HonigDunkel = Color(0xFF3B3524)
 private val Flieder300 = Color(0xFFCDB4DB)
@@ -108,6 +109,8 @@ private fun kachelFlaeche(seite: String): Color = when (seite) {
     Seite.LINKS -> Minze300
     Seite.RECHTS -> Flieder300
     Seite.BEIDSEITIG -> GrauRand
+    Seite.BREI -> Honig400
+    Seite.WASSER -> GrauRand
     else -> Honig300
 }
 
@@ -116,6 +119,7 @@ private fun kachelInhalt(seite: String): Color = when (seite) {
     Seite.LINKS -> Minze900
     Seite.RECHTS -> Flieder900
     Seite.BEIDSEITIG -> TextHell
+    Seite.WASSER -> TextHell
     else -> Honig900
 }
 
@@ -124,6 +128,7 @@ private fun zarteFlaeche(seite: String): Color = when (seite) {
     Seite.LINKS -> MinzeDunkel
     Seite.RECHTS -> FliederDunkel
     Seite.BEIDSEITIG -> GrauFlaeche
+    Seite.WASSER -> GrauFlaeche
     else -> HonigDunkel
 }
 
@@ -132,6 +137,8 @@ private fun akzent(seite: String): Color = when (seite) {
     Seite.LINKS -> Minze300
     Seite.RECHTS -> Flieder300
     Seite.BEIDSEITIG -> Grau300
+    Seite.BREI -> Honig400
+    Seite.WASSER -> Grau300
     else -> Honig300
 }
 
@@ -139,6 +146,8 @@ private fun iconFuer(seite: String): Int = when (seite) {
     Seite.LINKS -> R.drawable.ic_links
     Seite.RECHTS -> R.drawable.ic_rechts
     Seite.BEIDSEITIG -> R.drawable.ic_beidseitig
+    Seite.BREI -> R.drawable.ic_brei
+    Seite.WASSER -> R.drawable.ic_wasser
     else -> R.drawable.ic_flasche
 }
 
@@ -150,6 +159,7 @@ private sealed interface Ansicht {
     data object Liste : Ansicht
     data object ZeitWahl : Ansicht
     data object NeueFlasche : Ansicht
+    data class NeueMenge(val seite: String) : Ansicht
     data object Verbindung : Ansicht
     data class Bearbeiten(val eintrag: WatchEntry) : Ansicht
 }
@@ -170,11 +180,14 @@ fun StillzeitWearApp(model: WatchModel) {
                 onJetzt = { gewaehlteZeit = null },
                 onZeitWaehlen = { ansicht = Ansicht.ZeitWahl },
                 onSchnellEingabe = { seite ->
-                    if (seite == Seite.FLASCHE) {
-                        ansicht = Ansicht.NeueFlasche
-                    } else {
-                        model.anlegen(seite, gewaehlteZeit)
-                        gewaehlteZeit = null
+                    when {
+                        seite == Seite.FLASCHE -> ansicht = Ansicht.NeueFlasche
+                        // Brei/Wasser brauchen immer eine Menge.
+                        Seite.hatMenge(seite) -> ansicht = Ansicht.NeueMenge(seite)
+                        else -> {
+                            model.anlegen(seite, gewaehlteZeit)
+                            gewaehlteZeit = null
+                        }
                     }
                 },
                 onBearbeiten = { ansicht = Ansicht.Bearbeiten(it) },
@@ -190,6 +203,22 @@ fun StillzeitWearApp(model: WatchModel) {
                 start = gewaehlteZeit ?: LocalTime.now(),
                 onUebernehmen = {
                     gewaehlteZeit = it
+                    ansicht = Ansicht.Liste
+                },
+            )
+
+            is Ansicht.NeueMenge -> MengenAnsicht(
+                titel = aktuell.seite,
+                einheit = Seite.einheit(aktuell.seite),
+                werte = mengenWerte(ab = 10),
+                startMenge = if (aktuell.seite == Seite.BREI) 90 else 30,
+                onSpeichern = { menge ->
+                    model.anlegen(
+                        seite = aktuell.seite,
+                        zeit = gewaehlteZeit,
+                        menge = menge,
+                    )
+                    gewaehlteZeit = null
                     ansicht = Ansicht.Liste
                 },
             )
@@ -213,8 +242,8 @@ fun StillzeitWearApp(model: WatchModel) {
 
             is Ansicht.Bearbeiten -> {
                 val eintrag = aktuell.eintrag
-                if (eintrag.istFlasche) {
-                    FlaschenAnsicht(
+                when {
+                    eintrag.istFlasche -> FlaschenAnsicht(
                         titel = eintrag.titel,
                         werte = werteMit(mengenWerte(ab = 0), eintrag.menge ?: 0),
                         startMenge = eintrag.menge ?: 0,
@@ -224,8 +253,18 @@ fun StillzeitWearApp(model: WatchModel) {
                             ansicht = Ansicht.Liste
                         },
                     )
-                } else {
-                    DauerAnsicht(
+                    // Brei/Wasser: Menge ändern, ohne Flaschen-Art.
+                    eintrag.hatMenge -> MengenAnsicht(
+                        titel = eintrag.seite,
+                        einheit = eintrag.einheit ?: Seite.einheit(eintrag.seite),
+                        werte = werteMit(mengenWerte(ab = 0), eintrag.menge ?: 0),
+                        startMenge = eintrag.menge ?: 0,
+                        onSpeichern = { menge ->
+                            model.aendern(eintrag, menge)
+                            ansicht = Ansicht.Liste
+                        },
+                    )
+                    else -> DauerAnsicht(
                         titel = eintrag.seite,
                         startDauer = eintrag.dauerMinuten ?: 0,
                         onSpeichern = { minuten ->
@@ -280,7 +319,7 @@ private fun ListenAnsicht(
         ) {
             item { LetzterEintragKarte(model.letzterEintrag) }
             item { ZeitAuswahl(gewaehlteZeit, onJetzt, onZeitWaehlen) }
-            item { SchnellEingabe(onSchnellEingabe) }
+            item { SchnellEingabe(model.breiWasserAktiv, onSchnellEingabe) }
 
             if (model.laedt) {
                 item {
@@ -469,7 +508,7 @@ private fun RowScope.AuswahlKachel(
 }
 
 @Composable
-private fun SchnellEingabe(onSchnellEingabe: (String) -> Unit) {
+private fun SchnellEingabe(breiWasserAktiv: Boolean, onSchnellEingabe: (String) -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -481,6 +520,13 @@ private fun SchnellEingabe(onSchnellEingabe: (String) -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             AktionsKachel(Seite.BEIDSEITIG, onSchnellEingabe)
             AktionsKachel(Seite.FLASCHE, onSchnellEingabe)
+        }
+        // Nur bei aktiver Server-Option – der Server lehnt POSTs sonst ab.
+        if (breiWasserAktiv) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                AktionsKachel(Seite.BREI, onSchnellEingabe)
+                AktionsKachel(Seite.WASSER, onSchnellEingabe)
+            }
         }
     }
 }
@@ -750,6 +796,32 @@ private fun ZeitWahlAnsicht(start: LocalTime, onUebernehmen: (LocalTime) -> Unit
             ) { index ->
                 Text(zweistellig(index), style = MaterialTheme.typography.display3)
             }
+        }
+    }
+}
+
+@Composable
+private fun MengenAnsicht(
+    titel: String,
+    einheit: String,
+    werte: List<Int>,
+    startMenge: Int,
+    onSpeichern: (Int) -> Unit,
+) {
+    val auswahl = rememberPickerState(
+        initialNumberOfOptions = werte.size,
+        initiallySelectedOption = werte.indexOf(startMenge).coerceAtLeast(0),
+    )
+
+    AuswahlGeruest(titel = titel, speichernText = "Speichern", onSpeichern = {
+        onSpeichern(werte[auswahl.selectedOption])
+    }) {
+        Picker(
+            state = auswahl,
+            contentDescription = "Menge in $einheit",
+            modifier = Modifier.fillMaxWidth().height(70.dp),
+        ) { index ->
+            Text("${werte[index]} $einheit", style = MaterialTheme.typography.display3)
         }
     }
 }

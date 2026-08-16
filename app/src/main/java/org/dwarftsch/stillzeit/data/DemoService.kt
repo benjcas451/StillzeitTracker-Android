@@ -33,7 +33,11 @@ data class EntryRow(
  * Schema, gleiche Version. Bestehende Daten werden dadurch beim Umstieg auf
  * die native App nahtlos übernommen.
  */
-class DemoService(context: Context) : EntryService {
+class DemoService(
+    context: Context,
+    /** Lokale Entsprechung der Server-Option „Brei & Wasser“ (Demo-Toggle). */
+    private val breiWasserAktiv: () -> Boolean = { false },
+) : EntryService {
 
     private val helper = Helper(context.applicationContext)
 
@@ -75,11 +79,15 @@ class DemoService(context: Context) : EntryService {
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
+                    // Zeilen unbekannter Art (z. B. aus einem neueren Backup)
+                    // ausblenden statt falsch zuzuordnen.
+                    val seite = Seite.fromApi(cursor.getString(cursor.getColumnIndexOrThrow("seite")))
+                        ?: continue
                     add(
                         Entry(
                             id = cursor.getLong(cursor.getColumnIndexOrThrow("id")),
                             createTime = parseIsoZeit(cursor.getString(cursor.getColumnIndexOrThrow("create_time"))),
-                            seite = Seite.fromApi(cursor.getString(cursor.getColumnIndexOrThrow("seite"))),
+                            seite = seite,
                             menge = cursor.intOderNull("menge"),
                             flaschenArt = FlaschenArt.fromApi(cursor.stringOderNull("flaschen_art")),
                             dauerMinuten = cursor.intOderNull("dauer_minuten"),
@@ -102,15 +110,24 @@ class DemoService(context: Context) : EntryService {
             var flasche = 0
             var totalMl = 0
             var totalMinuten = 0
+            var brei = 0
+            var wasser = 0
+            var totalGBrei = 0
+            var totalMlWasser = 0
             while (cursor.moveToNext()) {
                 when (Seite.fromApi(cursor.getString(0))) {
                     Seite.LINKS -> { links++; totalMinuten += cursor.intOderNull("dauer_minuten") ?: 0 }
                     Seite.RECHTS -> { rechts++; totalMinuten += cursor.intOderNull("dauer_minuten") ?: 0 }
                     Seite.BEIDSEITIG -> { beidseitig++; totalMinuten += cursor.intOderNull("dauer_minuten") ?: 0 }
                     Seite.FLASCHE -> { flasche++; totalMl += cursor.intOderNull("menge") ?: 0 }
+                    Seite.BREI -> { brei++; totalGBrei += cursor.intOderNull("menge") ?: 0 }
+                    Seite.WASSER -> { wasser++; totalMlWasser += cursor.intOderNull("menge") ?: 0 }
+                    null -> Unit // unbekannte Zeile überspringen
                 }
             }
             TodayStats(
+                // Wie die Server-API: gesamt zählt nur Milchmahlzeiten –
+                // Brei und Wasser bewusst NICHT (Home-Assistant-Kontrakt).
                 gesamt = links + rechts + beidseitig + flasche,
                 links = links,
                 rechts = rechts,
@@ -118,6 +135,11 @@ class DemoService(context: Context) : EntryService {
                 flasche = flasche,
                 totalMl = totalMl,
                 totalMinuten = totalMinuten,
+                brei = brei,
+                wasser = wasser,
+                totalGBrei = totalGBrei,
+                totalMlWasser = totalMlWasser,
+                breiWasserAktiv = breiWasserAktiv(),
             )
         }
     }
@@ -133,9 +155,14 @@ class DemoService(context: Context) : EntryService {
         val werte = ContentValues().apply {
             put("create_time", zuDb(zeit))
             put("seite", seite.apiValue)
-            if (seite.isFlasche) {
+            if (seite.hatMenge) {
                 put("menge", menge ?: 0)
-                if (flaschenArt != null) put("flaschen_art", flaschenArt.apiValue) else putNull("flaschen_art")
+                // Flaschen-Art gibt es nur bei der Flasche.
+                if (seite.isFlasche && flaschenArt != null) {
+                    put("flaschen_art", flaschenArt.apiValue)
+                } else {
+                    putNull("flaschen_art")
+                }
                 putNull("dauer_minuten")
             } else {
                 putNull("menge")
@@ -148,9 +175,9 @@ class DemoService(context: Context) : EntryService {
             id = id,
             createTime = zeit,
             seite = seite,
-            menge = if (seite.isFlasche) (menge ?: 0) else null,
+            menge = if (seite.hatMenge) (menge ?: 0) else null,
             flaschenArt = if (seite.isFlasche) flaschenArt else null,
-            dauerMinuten = if (seite.isFlasche) null else dauerMinuten,
+            dauerMinuten = if (seite.hatDauer) dauerMinuten else null,
         )
     }
 
@@ -163,6 +190,12 @@ class DemoService(context: Context) : EntryService {
             helper.writableDatabase.update("entries", werte, "id = ?", arrayOf(id.toString()))
             Unit
         }
+
+    override suspend fun updateMenge(id: Long, menge: Int) = withContext(Dispatchers.IO) {
+        val werte = ContentValues().apply { put("menge", menge) }
+        helper.writableDatabase.update("entries", werte, "id = ?", arrayOf(id.toString()))
+        Unit
+    }
 
     override suspend fun updateDauer(id: Long, dauerMinuten: Int) = withContext(Dispatchers.IO) {
         val werte = ContentValues().apply { put("dauer_minuten", dauerMinuten) }

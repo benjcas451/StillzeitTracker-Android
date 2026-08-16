@@ -32,6 +32,11 @@ data class HomeUiState(
     val eintraege: List<Entry> = emptyList(),
     /** Für die Schnell-Eingabe gewählte Uhrzeit; null = "Jetzt". */
     val schnellZeit: LocalTime? = null,
+    /**
+     * Server-Option „Brei & Wasser“ des aktiven Zugangs. Vor dem ersten
+     * Netzwerk-Roundtrip aus dem Cache/Demo-Toggle geseedet.
+     */
+    val breiWasserAktiv: Boolean = false,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -75,6 +80,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun datenquelleNeuAufbauen() {
         service?.dispose()
         service = createConfiguredEntryService(getApplication(), settings, certSource)
+        // Buttons sofort korrekt zeigen, bevor die erste Antwort da ist.
+        state.value = state.value.copy(
+            breiWasserAktiv = settings.breiWasserAktivFuerAktuellenZugang(),
+        )
         aktualisieren()
     }
 
@@ -90,10 +99,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.fold(
                 onSuccess = { (stats, eintraege) ->
+                    settings.merkeBreiWasserAktiv(stats.breiWasserAktiv)
                     state.value = state.value.copy(
                         laedt = false,
                         stats = stats,
                         eintraege = eintraege,
+                        breiWasserAktiv = stats.breiWasserAktiv,
                     )
                 },
                 onFailure = { fehler ->
@@ -126,6 +137,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun flascheAendern(eintrag: Entry, menge: Int, flaschenArt: FlaschenArt) {
         fuehreAktionAus { it.updateFlasche(eintrag.id, menge, flaschenArt) }
+    }
+
+    fun mengeAendern(eintrag: Entry, menge: Int) {
+        fuehreAktionAus { it.updateMenge(eintrag.id, menge) }
     }
 
     fun dauerAendern(eintrag: Entry, dauerMinuten: Int) {

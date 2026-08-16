@@ -37,7 +37,7 @@ android {
         targetSdk = 36
         versionCode = wearVersionCodeOffset +
             ((findProperty("buildNumber") as String?)?.toIntOrNull() ?: 18)
-        versionName = "2.1.0"
+        versionName = "2.2.0"
     }
 
     signingConfigs {

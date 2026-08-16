@@ -78,6 +78,8 @@ private sealed interface DialogZustand {
     data class FlascheBearbeiten(val eintrag: Entry) : DialogZustand
     data class DauerNeu(val seite: Seite) : DialogZustand
     data class DauerBearbeiten(val eintrag: Entry) : DialogZustand
+    data class MengeNeu(val seite: Seite) : DialogZustand
+    data class MengeBearbeiten(val eintrag: Entry) : DialogZustand
     data object ZeitWahl : DialogZustand
     data class Loeschen(val eintrag: Entry) : DialogZustand
 }
@@ -99,6 +101,8 @@ fun HomeScreen(
     fun schnellAnlegen(seite: Seite) {
         when {
             seite.isFlasche -> dialog = DialogZustand.FlascheNeu
+            // Brei/Wasser brauchen immer eine Menge – Dialog in jedem Fall.
+            seite.istBreiWasser -> dialog = DialogZustand.MengeNeu(seite)
             // Bei gewählter Uhrzeit wird die Dauer direkt mit abgefragt.
             state.schnellZeit != null -> dialog = DialogZustand.DauerNeu(seite)
             else -> viewModel.anlegen(seite)
@@ -148,10 +152,10 @@ fun HomeScreen(
                         onZeitZuruecksetzen = { viewModel.setzeSchnellZeit(null) },
                         onSchnellAnlegen = ::schnellAnlegen,
                         onBearbeiten = { eintrag ->
-                            dialog = if (eintrag.seite.isFlasche) {
-                                DialogZustand.FlascheBearbeiten(eintrag)
-                            } else {
-                                DialogZustand.DauerBearbeiten(eintrag)
+                            dialog = when {
+                                eintrag.seite.isFlasche -> DialogZustand.FlascheBearbeiten(eintrag)
+                                eintrag.seite.istBreiWasser -> DialogZustand.MengeBearbeiten(eintrag)
+                                else -> DialogZustand.DauerBearbeiten(eintrag)
                             }
                         },
                         onLoeschen = { dialog = DialogZustand.Loeschen(it) },
@@ -186,6 +190,28 @@ fun HomeScreen(
             onSpeichern = { menge, art ->
                 dialog = null
                 viewModel.flascheAendern(aktuell.eintrag, menge, art)
+            },
+            onUngueltig = ::ungueltigeMenge,
+        )
+
+        is DialogZustand.MengeNeu -> MengeDialog(
+            seite = aktuell.seite,
+            onAbbrechen = { dialog = null },
+            onSpeichern = { menge ->
+                dialog = null
+                viewModel.anlegen(aktuell.seite, menge = menge)
+            },
+            onUngueltig = ::ungueltigeMenge,
+        )
+
+        is DialogZustand.MengeBearbeiten -> MengeDialog(
+            seite = aktuell.eintrag.seite,
+            bearbeiten = true,
+            initialMenge = aktuell.eintrag.menge,
+            onAbbrechen = { dialog = null },
+            onSpeichern = { menge ->
+                dialog = null
+                viewModel.mengeAendern(aktuell.eintrag, menge)
             },
             onUngueltig = ::ungueltigeMenge,
         )
@@ -258,7 +284,10 @@ private fun Inhalt(
                 onZuruecksetzen = onZeitZuruecksetzen,
             )
             Spacer(Modifier.height(10.dp))
-            SchnellEingabe(onAnlegen = onSchnellAnlegen)
+            SchnellEingabe(
+                breiWasserAktiv = state.breiWasserAktiv,
+                onAnlegen = onSchnellAnlegen,
+            )
             Spacer(Modifier.height(14.dp))
         }
 
@@ -316,6 +345,10 @@ private fun StatistikKarte(stats: TodayStats) {
                 StatWert("Beidseitig", "${stats.beidseitig}", Seite.BEIDSEITIG.statFarbe())
                 StatWert("Flasche", "${stats.flasche}", Seite.FLASCHE.statFarbe())
                 StatWert("Menge", "${stats.totalMl} ml", Seite.FLASCHE.statFarbe())
+                if (stats.breiWasserAktiv) {
+                    StatWert("Brei", "${stats.brei} · ${stats.totalGBrei} g", Seite.BREI.statFarbe())
+                    StatWert("Wasser", "${stats.wasser} · ${stats.totalMlWasser} ml", Seite.WASSER.statFarbe())
+                }
                 StatWert("Zeit", "${stats.totalMinuten} min", MinzeHonig.farben.gruenText)
             }
         }
@@ -382,12 +415,15 @@ private fun ZeitAuswahl(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SchnellEingabe(onAnlegen: (Seite) -> Unit) {
+private fun SchnellEingabe(breiWasserAktiv: Boolean, onAnlegen: (Seite) -> Unit) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Seite.entries.forEach { seite ->
+        // Brei/Wasser nur anbieten, wenn die Server-Option aktiv ist –
+        // ausblenden statt deaktivieren (der Server würde sonst mit 400 ablehnen).
+        val sichtbare = Seite.entries.filter { !it.istBreiWasser || breiWasserAktiv }
+        sichtbare.forEach { seite ->
             // Kategorie-Buttons nach dem Chip-Muster: Pastellfläche (300) mit
             // 900er-Text derselben Farbe, Radius 12, Höhe 44 (Touch-Minimum).
             Button(
@@ -487,8 +523,9 @@ private fun EintragsKachel(
                     )
                 }
                 Text(
-                    if (eintrag.seite.isFlasche) {
-                        "${eintrag.menge ?: 0} ml"
+                    if (eintrag.seite.hatMenge) {
+                        // Einheit aus dem API-Feld, lokal aus der Seite abgeleitet.
+                        "${eintrag.menge ?: 0} ${eintrag.anzeigeEinheit ?: "ml"}"
                     } else {
                         eintrag.dauerMinuten?.let { "$it min" } ?: "offen"
                     },

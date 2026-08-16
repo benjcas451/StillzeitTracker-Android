@@ -35,6 +35,9 @@ interface EntryService {
     /** Menge und Inhalt eines Flaschen-Eintrags ändern. */
     suspend fun updateFlasche(id: Long, menge: Int, flaschenArt: FlaschenArt)
 
+    /** Menge eines Brei-/Wasser-Eintrags ändern (ohne Flaschen-Art). */
+    suspend fun updateMenge(id: Long, menge: Int)
+
     /** Dauer eines Still-Eintrags ändern. */
     suspend fun updateDauer(id: Long, dauerMinuten: Int)
 

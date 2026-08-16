@@ -28,6 +28,11 @@ class WatchModel(context: Context) {
     private val store = ServerConnectionStore(context)
     private val hintergrund = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    // Letzter bekannter Stand der Server-Option „Brei & Wasser“, damit die
+    // Buttons schon vor der ersten Antwort richtig stehen. Der Wert gilt je
+    // Quelle (Relay bzw. Basis-URL der Direktverbindung).
+    private val flagPrefs =
+        context.applicationContext.getSharedPreferences("stillzeit_watch_flags", Context.MODE_PRIVATE)
 
     var eintraege by mutableStateOf<List<WatchEntry>>(emptyList())
         private set
@@ -46,6 +51,10 @@ class WatchModel(context: Context) {
     var verbindung by mutableStateOf<ServerConnection?>(null)
         private set
 
+    /** Server-Option „Brei & Wasser“ – blendet die zwei Extra-Buttons ein. */
+    var breiWasserAktiv by mutableStateOf(false)
+        private set
+
     val letzterEintrag: WatchEntry? get() = eintraege.firstOrNull()
 
     /** Statuszeile: „Direkt · API-Key“, „Direkt · mTLS“ oder „Über Handy“. */
@@ -53,6 +62,14 @@ class WatchModel(context: Context) {
 
     init {
         verbindung = store.laden()
+        breiWasserAktiv = flagPrefs.getBoolean(flagKey(), false)
+    }
+
+    private fun flagKey(): String = "brei_wasser_aktiv:" + (verbindung?.baseUrl ?: "relay")
+
+    private fun merkeBreiWasser(aktiv: Boolean) {
+        breiWasserAktiv = aktiv
+        flagPrefs.edit().putBoolean(flagKey(), aktiv).apply()
     }
 
     fun schliessen() {
@@ -101,6 +118,9 @@ class WatchModel(context: Context) {
         store.loeschen()
         verbindung = null
         fehler = null
+        // Die Quelle wechselt – Flag konservativ zurücksetzen, bis die
+        // nächste Antwort den Stand des neuen Wegs liefert.
+        breiWasserAktiv = flagPrefs.getBoolean(flagKey(), false)
         aktualisieren()
     }
 
@@ -137,6 +157,7 @@ class WatchModel(context: Context) {
         store.speichern(neu)
         verbindung = neu
         fehler = null
+        breiWasserAktiv = flagPrefs.getBoolean(flagKey(), false)
         // Eine eigene Erfolgsmeldung erübrigt sich: die Statuszeile zeigt ab
         // jetzt „Direkt · …“ statt „Über Handy“.
         aktualisieren()
@@ -179,7 +200,13 @@ class WatchModel(context: Context) {
                 when (aktion) {
                     Aktion.Laden -> {
                         val liste = api.eintraege()
-                        main.post { fertig(liste) }
+                        // Flag tolerant mitholen: schlägt nur diese Abfrage
+                        // fehl, bleibt der letzte bekannte Stand gültig.
+                        val aktiv = runCatching { api.breiWasserAktiv() }.getOrNull()
+                        main.post {
+                            aktiv?.let(::merkeBreiWasser)
+                            fertig(liste)
+                        }
                     }
 
                     is Aktion.Anlegen -> {
@@ -223,6 +250,14 @@ class WatchModel(context: Context) {
             action = aktion.relayAction,
             arguments = aktion.relayArgumente(),
             onSuccess = { daten ->
+                // Neue Handy-Apps liefern das Flag im Dashboard mit; fehlt es
+                // (alte Handy-App), bleiben die Buttons konservativ versteckt.
+                if (daten.has("brei_wasser_aktiv")) {
+                    merkeBreiWasser(
+                        daten.optBoolean("brei_wasser_aktiv", false) ||
+                            daten.optInt("brei_wasser_aktiv", 0) != 0,
+                    )
+                }
                 fertig(WatchEntry.listeAusJson(daten.optJSONArray("entries")), hinweisText)
             },
             onError = ::fehlschlag,
@@ -249,11 +284,14 @@ class WatchModel(context: Context) {
         is Aktion.Aendern -> JSONObject().apply {
             put("id", eintrag.id)
             put("seite", eintrag.seite)
-            if (eintrag.istFlasche) {
-                put("menge", wert)
-                put("flaschen_art", flaschenArt ?: eintrag.flaschenArt ?: FlaschenArt.PRE)
-            } else {
-                put("dauer_minuten", wert)
+            when {
+                eintrag.istFlasche -> {
+                    put("menge", wert)
+                    put("flaschen_art", flaschenArt ?: eintrag.flaschenArt ?: FlaschenArt.PRE)
+                }
+                // Brei/Wasser: Menge ohne Flaschen-Art.
+                eintrag.hatMenge -> put("menge", wert)
+                else -> put("dauer_minuten", wert)
             }
         }
     }

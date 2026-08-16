@@ -4,7 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocalDrink
+import androidx.compose.material.icons.filled.RiceBowl
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.Instant
 import java.time.LocalDateTime
@@ -19,9 +21,29 @@ enum class Seite(val apiValue: String) {
     LINKS("Links"),
     RECHTS("Rechts"),
     BEIDSEITIG("Beidseitig"),
-    FLASCHE("Flasche");
+    FLASCHE("Flasche"),
+    BREI("Brei"),
+    WASSER("Wasser");
 
+    /** Nur für Pre/Mutter-Belange (FlaschenArt) – nicht für die Mengenlogik. */
     val isFlasche: Boolean get() = this == FLASCHE
+
+    /** Einträge mit Pflicht-Menge (Flasche in ml, Brei in g, Wasser in ml). */
+    val hatMenge: Boolean get() = this == FLASCHE || this == BREI || this == WASSER
+
+    /** Still-Einträge, bei denen `dauer_minuten` erlaubt ist. */
+    val hatDauer: Boolean get() = !hatMenge
+
+    /** Nur anbieten, wenn die Server-Option `brei_wasser_aktiv` an ist. */
+    val istBreiWasser: Boolean get() = this == BREI || this == WASSER
+
+    /** Anzeigeeinheit der Menge; Fallback, wenn die API kein `einheit` liefert. */
+    val mengenEinheit: String?
+        get() = when (this) {
+            FLASCHE, WASSER -> "ml"
+            BREI -> "g"
+            else -> null
+        }
 
     val icon: ImageVector
         get() = when (this) {
@@ -29,11 +51,18 @@ enum class Seite(val apiValue: String) {
             RECHTS -> Icons.Filled.ChevronRight
             BEIDSEITIG -> Icons.Filled.SwapHoriz
             FLASCHE -> Icons.Filled.LocalDrink
+            BREI -> Icons.Filled.RiceBowl
+            WASSER -> Icons.Filled.WaterDrop
         }
 
     companion object {
-        fun fromApi(value: String?): Seite =
-            entries.firstOrNull { it.apiValue == value } ?: LINKS
+        /**
+         * Unbekannte Werte liefern null – Aufrufer blenden solche Einträge aus
+         * (Listen) bzw. melden einen Fehler (Watch-Anfragen), statt sie wie
+         * früher stillschweigend als „Links“ auszugeben.
+         */
+        fun fromApi(value: String?): Seite? =
+            entries.firstOrNull { it.apiValue == value }
     }
 }
 
@@ -48,18 +77,23 @@ enum class FlaschenArt(val apiValue: String) {
     }
 }
 
-/** Ein einzelner Stillzeit-/Flaschen-Eintrag. */
+/** Ein einzelner Stillzeit-/Flaschen-/Brei-/Wasser-Eintrag. */
 data class Entry(
     val id: Long,
     val createTime: Instant,
     val seite: Seite,
-    /** Nur bei [Seite.FLASCHE] gesetzt (Menge in ml), sonst null. */
+    /** Bei Einträgen mit [Seite.hatMenge] gesetzt, sonst null. */
     val menge: Int? = null,
     /** Inhalt der Flasche (Pre oder Mutter). Bei älteren Einträgen null. */
     val flaschenArt: FlaschenArt? = null,
     /** Nur bei Still-Einträgen gesetzt (Dauer in Minuten), sonst null. */
     val dauerMinuten: Int? = null,
-)
+    /** Einheit der Menge („ml“/„g“) – vom Server geliefert, lokal abgeleitet. */
+    val einheit: String? = null,
+) {
+    /** Einheit für die Anzeige: API-Wert, sonst aus der Seite abgeleitet. */
+    val anzeigeEinheit: String? get() = einheit ?: seite.mengenEinheit
+}
 
 /** Tagesstatistik (`GET /api/?action=heute`). */
 data class TodayStats(
@@ -70,6 +104,16 @@ data class TodayStats(
     val flasche: Int,
     val totalMl: Int,
     val totalMinuten: Int,
+    /** Anzahl Brei-Einträge heute (0, solange die Option aus ist). */
+    val brei: Int = 0,
+    /** Anzahl Wasser-Einträge heute. */
+    val wasser: Int = 0,
+    /** Brei-Gesamtmenge heute in Gramm. */
+    val totalGBrei: Int = 0,
+    /** Wasser-Gesamtmenge heute in Millilitern (getrennt von [totalMl]). */
+    val totalMlWasser: Int = 0,
+    /** Server-Option „Brei & Wasser“ dieser Familie. */
+    val breiWasserAktiv: Boolean = false,
 )
 
 /**

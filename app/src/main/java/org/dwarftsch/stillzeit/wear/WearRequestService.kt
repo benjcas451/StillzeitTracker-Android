@@ -72,10 +72,10 @@ class WearRequestService : WearableListenerService() {
         return when (action) {
             "getConnection" -> verbindung(settings, certSource)
 
-            "getDashboard" -> mitService(settings, certSource) { service -> dashboard(service) }
+            "getDashboard" -> mitService(settings, certSource) { service -> dashboard(service, settings) }
 
             "createEntry" -> mitService(settings, certSource) { service ->
-                val seite = Seite.fromApi(argumente.optString("seite", "Links"))
+                val seite = seiteAus(argumente)
                 service.createEntry(
                     seite = seite,
                     menge = argumente.intOderNull("menge"),
@@ -85,21 +85,24 @@ class WearRequestService : WearableListenerService() {
                         ?.let { runCatching { parseIsoZeit(it) }.getOrNull() },
                 )
                 WatchChangeBus.melden()
-                dashboard(service)
+                dashboard(service, settings)
             }
 
             "updateEntry" -> mitService(settings, certSource) { service ->
                 val id = argumente.getLong("id")
-                val seite = Seite.fromApi(argumente.optString("seite", "Links"))
-                if (seite.isFlasche) {
-                    val flaschenArt = FlaschenArt.fromApi(argumente.stringOderNull("flaschen_art"))
-                        ?: throw IllegalArgumentException("Flaschenart fehlt.")
-                    service.updateFlasche(id, argumente.getInt("menge"), flaschenArt)
-                } else {
-                    service.updateDauer(id, argumente.getInt("dauer_minuten"))
+                val seite = seiteAus(argumente)
+                when {
+                    seite.isFlasche -> {
+                        val flaschenArt = FlaschenArt.fromApi(argumente.stringOderNull("flaschen_art"))
+                            ?: throw IllegalArgumentException("Flaschenart fehlt.")
+                        service.updateFlasche(id, argumente.getInt("menge"), flaschenArt)
+                    }
+                    // Brei/Wasser: Menge ohne Flaschen-Art (Server lehnt sie ab).
+                    seite.hatMenge -> service.updateMenge(id, argumente.getInt("menge"))
+                    else -> service.updateDauer(id, argumente.getInt("dauer_minuten"))
                 }
                 WatchChangeBus.melden()
-                dashboard(service)
+                dashboard(service, settings)
             }
 
             else -> throw IllegalArgumentException("Unbekannte Watch-Anfrage: $action")
@@ -158,12 +161,35 @@ class WearRequestService : WearableListenerService() {
         }
     }
 
-    private suspend fun dashboard(service: EntryService): JSONObject {
-        val eintraege = service.getEntries().take(12)
-        return JSONObject().put("entries", JSONArray().apply {
-            eintraege.forEach { put(alsJson(it)) }
-        })
+    /**
+     * Die Uhr sendet nur Werte ihrer eigenen Buttons – ein unbekannter Wert
+     * ist ein echter Fehler und wird gemeldet statt still als „Links“ gedeutet.
+     */
+    private fun seiteAus(argumente: JSONObject): Seite {
+        val roh = argumente.optString("seite", "")
+        return Seite.fromApi(roh)
+            ?: throw IllegalArgumentException("Unbekannte Eintragsart: $roh")
     }
+
+    private suspend fun dashboard(service: EntryService, settings: AppSettings): JSONObject {
+        val eintraege = service.getEntries().take(12)
+        return JSONObject()
+            .put("entries", JSONArray().apply { eintraege.forEach { put(alsJson(it)) } })
+            .put("brei_wasser_aktiv", breiWasserAktiv(service, settings))
+    }
+
+    /**
+     * Stand der Server-Option für die Uhr: im Demo-Modus der lokale Toggle,
+     * sonst frisch vom Server (und dabei den Telefon-Cache aktualisieren);
+     * schlägt die Abfrage fehl, gilt der letzte bekannte Wert.
+     */
+    private suspend fun breiWasserAktiv(service: EntryService, settings: AppSettings): Boolean =
+        when (settings.mode) {
+            DataSourceMode.DEMO -> settings.breiWasserDemoAktiv
+            else -> runCatching { service.getToday().breiWasserAktiv }
+                .onSuccess { settings.merkeBreiWasserAktiv(it) }
+                .getOrElse { settings.breiWasserAktivFuerAktuellenZugang() }
+        }
 
     private fun alsJson(entry: Entry): JSONObject = JSONObject().apply {
         put("id", entry.id)
@@ -174,6 +200,7 @@ class WearRequestService : WearableListenerService() {
         entry.menge?.let { put("menge", it) }
         entry.flaschenArt?.let { put("flaschen_art", it.apiValue) }
         entry.dauerMinuten?.let { put("dauer_minuten", it) }
+        entry.anzeigeEinheit?.let { put("einheit", it) }
     }
 
     private fun erfolg(daten: JSONObject): ByteArray =

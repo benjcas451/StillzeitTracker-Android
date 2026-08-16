@@ -1,0 +1,10 @@
+<!-- Material Symbol "rice_bowl" – gefüllt, wie die übrigen Eintragsart-Icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M22,12L22,2L2,2v10c0,3.69 2.47,6.86 6,8.25L8,22h8v-1.75c3.53,-1.39 6,-4.56 6,-8.25zM20,10h-2L18,4h2v6zM14,4v6h-4L10,4h4zM4,4h4v6L4,10L4,4z"/>
+</vector>

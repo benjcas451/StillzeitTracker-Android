@@ -106,6 +106,61 @@ fun FlascheDialog(
     )
 }
 
+/**
+ * Dialog für die Menge eines Brei-/Wasser-Eintrags (neu oder bearbeiten).
+ * Wie der Flaschen-Dialog, nur ohne Pre/Mutter-Auswahl; die Einheit kommt
+ * aus der Seite (Brei in g, Wasser in ml).
+ */
+@Composable
+fun MengeDialog(
+    seite: Seite,
+    bearbeiten: Boolean = false,
+    initialMenge: Int? = null,
+    onAbbrechen: () -> Unit,
+    onSpeichern: (menge: Int) -> Unit,
+    onUngueltig: () -> Unit,
+) {
+    var mengeText by remember { mutableStateOf(initialMenge?.toString() ?: "") }
+    val einheit = seite.mengenEinheit ?: "ml"
+
+    fun speichern() {
+        val menge = mengeText.trim().toIntOrNull()
+        if (menge == null || menge < 0) {
+            onUngueltig()
+            return
+        }
+        onSpeichern(menge)
+    }
+
+    AlertDialog(
+        shape = MaterialTheme.shapes.extraLarge,
+        onDismissRequest = onAbbrechen,
+        title = { Text(if (bearbeiten) "Menge ändern" else "${seite.apiValue} hinzufügen") },
+        text = {
+            OutlinedTextField(
+                value = mengeText,
+                onValueChange = { mengeText = it },
+                shape = MaterialTheme.shapes.medium,
+                colors = mhEingabefeldFarben(),
+                label = { Text("Menge in $einheit") },
+                suffix = { Text(einheit) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            Button(onClick = ::speichern, shape = MaterialTheme.shapes.medium) { Text("Speichern") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onAbbrechen,
+                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
+            ) { Text("Abbrechen") }
+        },
+    )
+}
+
 /** Dialog für die Dauer eines Still-Eintrags (neu oder bearbeiten). */
 @Composable
 fun DauerDialog(

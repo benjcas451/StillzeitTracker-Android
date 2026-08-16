@@ -60,6 +60,36 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_CERT_FOLDER_URI, null)
         set(value) = prefs.edit().putString(KEY_CERT_FOLDER_URI, value).apply()
 
+    /** Demo-Modus: lokale Entsprechung der Server-Option „Brei & Wasser“. */
+    var breiWasserDemoAktiv: Boolean
+        get() = prefs.getBoolean(KEY_BREI_WASSER_DEMO, false)
+        set(value) = prefs.edit().putBoolean(KEY_BREI_WASSER_DEMO, value).apply()
+
+    /**
+     * Zuletzt vom Server gemeldeter Stand der Option „Brei & Wasser“ –
+     * pro Zugang (Modus + Basis-URL) gehalten, weil die Option je Familie
+     * geschaltet wird. Im Demo-Modus gilt stattdessen [breiWasserDemoAktiv].
+     */
+    fun breiWasserAktivFuerAktuellenZugang(): Boolean = when (mode) {
+        DataSourceMode.DEMO -> breiWasserDemoAktiv
+        else -> prefs.getBoolean(breiWasserCacheKey(), false)
+    }
+
+    /** Cache nach erfolgreichem `?action=heute` aktualisieren (nicht im Demo). */
+    fun merkeBreiWasserAktiv(aktiv: Boolean) {
+        if (mode == DataSourceMode.DEMO) return
+        prefs.edit().putBoolean(breiWasserCacheKey(), aktiv).apply()
+    }
+
+    private fun breiWasserCacheKey(): String {
+        val baseUrl = when (mode) {
+            DataSourceMode.API -> apiBaseUrl
+            DataSourceMode.API_KEY -> apiKeyBaseUrl
+            DataSourceMode.DEMO -> ""
+        }
+        return "$KEY_BREI_WASSER_AKTIV:${mode.gespeichert}:$baseUrl"
+    }
+
     private fun ladeUrl(key: String): String {
         val url = prefs.getString(key, "").orEmpty().trim()
         if (url.isEmpty()) return ""
@@ -87,5 +117,7 @@ class AppSettings(context: Context) {
         const val KEY_API_KEY_BASE_URL = "api_key_base_url"
         const val KEY_CERT_FOLDER_URI = "cert_folder_uri"
         const val KEY_MIGRIERT = "migriert_von_flutter"
+        const val KEY_BREI_WASSER_DEMO = "brei_wasser_demo_aktiv"
+        const val KEY_BREI_WASSER_AKTIV = "brei_wasser_aktiv"
     }
 }

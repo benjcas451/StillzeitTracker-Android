@@ -66,8 +66,9 @@ class ApiService(
             ?: throw ApiException("Ungültige API-URL: $baseUrl")
     }
 
-    // Query-Form `/api/?id=43` statt Pfad-Form `/api/entries/43` – letztere
-    // braucht serverseitiges URL-Rewrite und liefert sonst 404.
+    // Query-Form `/api/?id=43` statt Pfad-Form `/api/entries/43`. Die Pfad-Form
+    // wird inzwischen serverseitig geroutet; die Query-Form funktioniert aber
+    // auf allen Hosts inklusive der Legacy-Route ohne `/api/` – dabei bleiben.
     private fun entryUrl(id: Long): HttpUrl =
         root().newBuilder().addQueryParameter("id", id.toString()).build()
 
@@ -119,7 +120,8 @@ class ApiService(
         val data = send("GET", root()) as? JSONObject
             ?: throw ApiException("Unerwartete Antwort der API.")
         val liste = data.getJSONArray("entries")
-        return (0 until liste.length()).map { eintragAusJson(liste.getJSONObject(it)) }
+        // Einträge unbekannter Art (künftige Servererweiterungen) ausblenden.
+        return (0 until liste.length()).mapNotNull { eintragAusJson(liste.getJSONObject(it)) }
     }
 
     override suspend fun getToday(): TodayStats {
@@ -134,6 +136,13 @@ class ApiService(
             flasche = v("flasche"),
             totalMl = v("total_ml"),
             totalMinuten = v("total_minuten"),
+            brei = v("brei"),
+            wasser = v("wasser"),
+            totalGBrei = v("total_g_brei"),
+            totalMlWasser = v("total_ml_wasser"),
+            // Tolerant lesen: je nach PHP-Serialisierung true/false oder 0/1.
+            breiWasserAktiv = data.optBoolean("brei_wasser_aktiv", false) ||
+                data.optInt("brei_wasser_aktiv", 0) != 0,
         )
     }
 
@@ -145,11 +154,14 @@ class ApiService(
         createTime: Instant?,
     ): Entry {
         val body = JSONObject().put("seite", seite.apiValue)
-        if (seite.isFlasche) {
+        if (seite.hatMenge) {
             body.put("menge", menge ?: 0)
-            if (flaschenArt != null) body.put("flaschen_art", flaschenArt.apiValue)
+            // flaschen_art akzeptiert der Server nur bei der Flasche (sonst 400).
+            if (seite.isFlasche && flaschenArt != null) {
+                body.put("flaschen_art", flaschenArt.apiValue)
+            }
         }
-        if (!seite.isFlasche && dauerMinuten != null) {
+        if (seite.hatDauer && dauerMinuten != null) {
             body.put("dauer_minuten", dauerMinuten)
         }
         if (createTime != null) {
@@ -158,6 +170,7 @@ class ApiService(
         val data = send("POST", root(), body) as? JSONObject
             ?: throw ApiException("Unerwartete Antwort der API.")
         return eintragAusJson(data)
+            ?: throw ApiException("Unerwartete Antwort der API (unbekannte Seite).")
     }
 
     override suspend fun updateFlasche(id: Long, menge: Int, flaschenArt: FlaschenArt) {
@@ -166,6 +179,10 @@ class ApiService(
             entryUrl(id),
             JSONObject().put("menge", menge).put("flaschen_art", flaschenArt.apiValue),
         )
+    }
+
+    override suspend fun updateMenge(id: Long, menge: Int) {
+        send("PATCH", entryUrl(id), JSONObject().put("menge", menge))
     }
 
     override suspend fun updateDauer(id: Long, dauerMinuten: Int) {
@@ -177,14 +194,18 @@ class ApiService(
     }
 
     private companion object {
-        fun eintragAusJson(json: JSONObject): Entry = Entry(
-            id = json.getLong("id"),
-            createTime = parseIsoZeit(json.getString("create_time")),
-            seite = Seite.fromApi(json.getString("seite")),
-            menge = json.intOderNull("menge"),
-            flaschenArt = FlaschenArt.fromApi(json.stringOderNull("flaschen_art")),
-            dauerMinuten = json.intOderNull("dauer_minuten"),
-        )
+        fun eintragAusJson(json: JSONObject): Entry? {
+            val seite = Seite.fromApi(json.getString("seite")) ?: return null
+            return Entry(
+                id = json.getLong("id"),
+                createTime = parseIsoZeit(json.getString("create_time")),
+                seite = seite,
+                menge = json.intOderNull("menge"),
+                flaschenArt = FlaschenArt.fromApi(json.stringOderNull("flaschen_art")),
+                dauerMinuten = json.intOderNull("dauer_minuten"),
+                einheit = json.stringOderNull("einheit"),
+            )
+        }
 
         /**
          * Formatiert einen Zeitpunkt als ISO 8601 mit Zeitzonen-Offset,

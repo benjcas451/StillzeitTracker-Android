@@ -7,12 +7,21 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 
-/** Eintragstypen — die Werte sind exakt die `apiValue` der Flutter-App. */
+/** Eintragstypen — die Werte sind exakt die `apiValue` der Handy-App. */
 object Seite {
     const val LINKS = "Links"
     const val RECHTS = "Rechts"
     const val BEIDSEITIG = "Beidseitig"
     const val FLASCHE = "Flasche"
+    const val BREI = "Brei"
+    const val WASSER = "Wasser"
+
+    /** Einträge mit Pflicht-Menge (Flasche/Wasser in ml, Brei in g). */
+    fun hatMenge(seite: String): Boolean =
+        seite == FLASCHE || seite == BREI || seite == WASSER
+
+    /** Anzeigeeinheit, falls die Handy-App kein `einheit`-Feld liefert. */
+    fun einheit(seite: String): String = if (seite == BREI) "g" else "ml"
 }
 
 /** Flascheninhalte — exakt die `apiValue` von `FlaschenArt` in der Flutter-App. */
@@ -31,16 +40,24 @@ data class WatchEntry(
     val menge: Int?,
     val flaschenArt: String?,
     val dauerMinuten: Int?,
+    /** Einheit der Menge („ml“/„g“), von der Handy-App geliefert. */
+    val einheit: String? = null,
 ) {
     val istFlasche: Boolean get() = seite == Seite.FLASCHE
+
+    val hatMenge: Boolean get() = Seite.hatMenge(seite)
 
     /** "Flasche · Pre" bzw. schlicht der Eintragstyp. */
     val titel: String
         get() = if (istFlasche && flaschenArt != null) "$seite · $flaschenArt" else seite
 
-    /** Der bearbeitbare Wert als Text: Menge bei Flaschen, sonst die Dauer. */
+    /** Der bearbeitbare Wert als Text: Menge (mit Einheit), sonst die Dauer. */
     val wertText: String
-        get() = if (istFlasche) "${menge ?: 0} ml" else "${dauerMinuten ?: 0} Min."
+        get() = if (hatMenge) {
+            "${menge ?: 0} ${einheit ?: Seite.einheit(seite)}"
+        } else {
+            "${dauerMinuten ?: 0} Min."
+        }
 
     companion object {
         fun listeAusJson(array: JSONArray?): List<WatchEntry> {
@@ -65,6 +82,7 @@ data class WatchEntry(
                 menge = json.optIntOderNull("menge"),
                 flaschenArt = json.optString("flaschen_art").takeIf { it.isNotEmpty() },
                 dauerMinuten = json.optIntOderNull("dauer_minuten"),
+                einheit = json.optString("einheit").takeIf { it.isNotEmpty() },
             )
         }
 

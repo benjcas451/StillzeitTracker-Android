@@ -109,8 +109,10 @@ object MinzeHonig {
 
 // ============================================================================
 // Eintragsarten: feste Farbzuordnung nach dem Chip-/Badge-Muster des Guides
-// (Pastellfläche + dunkler Text derselben Farbe). Drei Markenfarben für vier
-// Arten – Beidseitig bekommt das neutrale Grau ("beide Seiten").
+// (Pastellfläche + dunkler Text derselben Farbe). Drei Markenfarben für die
+// Milchmahlzeiten – Beidseitig bekommt das neutrale Grau ("beide Seiten").
+// Brei liegt wie in der Weboberfläche in der Honig-Familie eine Stufe dunkler
+// als die Flasche, Wasser ist neutral grau (Unterscheidung übers Icon).
 // ============================================================================
 
 /**
@@ -125,6 +127,8 @@ fun Seite.buttonFlaeche(): Color = when (this) {
     Seite.RECHTS -> Mh.lila300
     Seite.BEIDSEITIG -> if (isSystemInDarkTheme()) Mh.dunkelRand else Mh.grau200
     Seite.FLASCHE -> Mh.gelb300
+    Seite.BREI -> Mh.gelb400
+    Seite.WASSER -> if (isSystemInDarkTheme()) Mh.dunkelRand else Mh.grau200
 }
 
 /** Text/Icon auf der Button-Fläche (Stufe 900 bzw. helles Grau im Dark). */
@@ -134,6 +138,8 @@ fun Seite.buttonInhalt(): Color = when (this) {
     Seite.RECHTS -> Mh.lila900
     Seite.BEIDSEITIG -> if (isSystemInDarkTheme()) Mh.dunkelText else Mh.grau800
     Seite.FLASCHE -> Mh.gelb900
+    Seite.BREI -> Mh.gelb900
+    Seite.WASSER -> if (isSystemInDarkTheme()) Mh.dunkelText else Mh.grau800
 }
 
 /** Zarte Fläche (Stufe 100 bzw. Dark-Äquivalent) für Listen-Avatare. */
@@ -145,6 +151,8 @@ fun Seite.avatarFlaeche(): Color {
         Seite.RECHTS -> if (dunkel) Mh.dunkelLilaFlaeche else Mh.lila100
         Seite.BEIDSEITIG -> if (dunkel) Mh.grau800 else Mh.grau100
         Seite.FLASCHE -> if (dunkel) Mh.dunkelGelbFlaeche else Mh.gelb100
+        Seite.BREI -> if (dunkel) Mh.dunkelGelbFlaeche else Mh.gelb200
+        Seite.WASSER -> if (dunkel) Mh.grau800 else Mh.grau100
     }
 }
 
@@ -157,6 +165,8 @@ fun Seite.avatarInhalt(): Color {
         Seite.RECHTS -> if (dunkel) Mh.lila300 else Mh.lila700
         Seite.BEIDSEITIG -> if (dunkel) Mh.grau300 else Mh.grau700
         Seite.FLASCHE -> if (dunkel) Mh.gelb300 else Mh.gelb700
+        Seite.BREI -> if (dunkel) Mh.gelb400 else Mh.gelb900
+        Seite.WASSER -> if (dunkel) Mh.grau300 else Mh.grau700
     }
 }
 
