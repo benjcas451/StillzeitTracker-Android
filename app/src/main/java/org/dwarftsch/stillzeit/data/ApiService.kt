@@ -50,9 +50,20 @@ class ApiService(
     }
 
     override fun dispose() {
-        client?.dispatcher?.executorService?.shutdown()
-        client?.connectionPool?.evictAll()
+        // Abbau auf einen Hintergrund-Thread schieben: bei einer TLS-Verbindung
+        // schreibt Conscrypt beim close() noch das close_notify ins Socket
+        // (ConscryptEngineSocket.drainOutgoingQueue). Das ist echter
+        // Netzwerkzugriff — auf dem Main-Thread wirft StrictMode dafür eine
+        // NetworkOnMainThreadException und die App stürzt ab. Getroffen hat es
+        // jeden Rückweg aus den Einstellungen, weil
+        // HomeViewModel.datenquelleNeuAufbauen() direkt aus dem Back-Handler
+        // läuft und die Verbindung im Server-Modus noch im Pool liegt.
+        val alterClient = client ?: return
         client = null
+        Thread({
+            alterClient.dispatcher.executorService.shutdown()
+            alterClient.connectionPool.evictAll()
+        }, "stillzeit-api-dispose").start()
     }
 
     private fun root(): HttpUrl {
