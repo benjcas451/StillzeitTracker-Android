@@ -18,6 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # versionName aus dem Buildfile lesen, statt ihn im Workflow zu
+      # doppeln: bis 2.2.0 stand hier fest "2.1.0", sodass Tag und
+      # Dateinamen des Releases nicht mehr zur gebauten App passten.
+      - name: Version aus dem Buildfile lesen
+        id: version
+        run: |
+          v=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$v" ]; then
+            echo "::error::versionName liess sich aus app/build.gradle.kts nicht lesen."
+            exit 1
+          fi
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          echo "Gebaute Version: $v"
+
       # Start-JDK für den Gradle-Launcher; den eigentlichen Daemon-JDK (25)
       # provisioniert Gradle selbst über gradle/gradle-daemon-jvm.properties
       # (Foojay-Toolchain-Resolver).
@@ -67,18 +81,18 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: app/build/outputs/apk/release/app-release.apk
-          asset_name: Stillzeit-v2.1.0-${{ github.run_number }}.apk
-          tag: v2.1.0-${{ github.run_number }}
+          asset_name: Stillzeit-v${{ steps.version.outputs.name }}-${{ github.run_number }}.apk
+          tag: v${{ steps.version.outputs.name }}-${{ github.run_number }}
           overwrite: true
-          body: "Stillzeit v2.1.0 (Lauf ${{ github.run_number }}) – signierte APKs für Handy und Wear OS (Play-Upload erfolgt als App Bundle)"
+          body: "Stillzeit v${{ steps.version.outputs.name }} (Lauf ${{ github.run_number }}) – signierte APKs für Handy und Wear OS (Play-Upload erfolgt als App Bundle)"
 
       - name: Wear-APK an dasselbe Release anhängen
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: wear/build/outputs/apk/release/wear-release.apk
-          asset_name: Stillzeit-Wear-v2.1.0-${{ github.run_number }}.apk
-          tag: v2.1.0-${{ github.run_number }}
+          asset_name: Stillzeit-Wear-v${{ steps.version.outputs.name }}-${{ github.run_number }}.apk
+          tag: v${{ steps.version.outputs.name }}-${{ github.run_number }}
           overwrite: true
 
       # Handy- und Uhr-Bundle MÜSSEN in getrennten Schritten (= getrennten

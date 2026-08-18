@@ -359,9 +359,9 @@ fun SettingsScreen(
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Abschnitt("Brei & Wasser")
-            // Lokales Opt-in (Default aus): erst dieser Schalter blendet die
-            // beiden Erfassungs-Buttons ein – in den Server-Modi zusätzlich
-            // nur, wenn auch die Server-Option der Familie aktiv ist.
+            // Lokales Opt-in (Default aus): allein dieser Schalter blendet die
+            // beiden Erfassungs-Buttons ein – in jedem Modus. Der Stand der
+            // Server-Option ist nur noch ein Hinweis (siehe unten).
             var breiWasserAktiviert by remember { mutableStateOf(settings.breiWasserAktiviert) }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -370,13 +370,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Brei & Wasser erfassen")
                     Text(
-                        if (mode == DataSourceMode.DEMO) {
-                            "Zusätzliche Buttons für Brei (g) und Wasser (ml)."
-                        } else {
-                            "Zusätzliche Buttons für Brei (g) und Wasser (ml) – " +
-                                "erscheinen nur, wenn der Server die Option für " +
-                                "diese Familie anbietet."
-                        },
+                        "Zusätzliche Buttons für Brei (g) und Wasser (ml).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -387,6 +381,20 @@ fun SettingsScreen(
                         breiWasserAktiviert = it
                         settings.breiWasserAktiviert = it
                     },
+                )
+            }
+            // Der Server kann die Eintragsarten pro Familie abschalten und
+            // lehnt sie dann mit 400 ab. Das ist ein Hinweis, kein Riegel:
+            // meldet ein Server das Flag gar nicht erst, bliebe der Schalter
+            // sonst wirkungslos (Fehlerbild bis 2.2.0).
+            if (breiWasserAktiviert && !settings.serverOptionZuletztAktiv()) {
+                Text(
+                    "Dieser Server hat die Option für deine Familie zuletzt nicht " +
+                        "gemeldet. Legst du trotzdem Brei oder Wasser an, kann er " +
+                        "den Eintrag ablehnen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 )
             }
 

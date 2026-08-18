@@ -71,18 +71,24 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_BREI_WASSER_AKTIVIERT, value).apply()
 
     /**
-     * Effektive Sichtbarkeit für den aktuellen Zugang: lokales Opt-in UND
-     * (im Server-Modus) der zuletzt gemeldete Stand der Server-Option –
-     * pro Zugang (Modus + Basis-URL) gecacht, weil sie je Familie geschaltet
-     * wird. Im Demo-Modus genügt das Opt-in.
+     * Effektive Sichtbarkeit der Brei-/Wasser-Buttons: allein das lokale
+     * Opt-in entscheidet – in jedem Modus.
+     *
+     * Bis 2.2.0 war die Sichtbarkeit im Server-Modus zusätzlich an
+     * `brei_wasser_aktiv` aus `?action=heute` gekoppelt. Meldet ein Server
+     * das Flag nicht (oder nicht positiv), konnte der Schalter die Buttons
+     * nie einblenden – er war dort wirkungslos. Der Server-Stand ist deshalb
+     * nur noch ein Hinweis, siehe [serverOptionZuletztAktiv].
      */
-    fun breiWasserAktivFuerAktuellenZugang(): Boolean {
-        if (!breiWasserAktiviert) return false
-        return when (mode) {
-            DataSourceMode.DEMO -> true
-            else -> prefs.getBoolean(breiWasserCacheKey(), false)
-        }
-    }
+    fun breiWasserAktivFuerAktuellenZugang(): Boolean = breiWasserAktiviert
+
+    /**
+     * Zuletzt vom Server gemeldeter Stand der Option für den aktuellen Zugang
+     * (Modus + Basis-URL), rein informativ für den Hinweis in den
+     * Einstellungen. Im Demo-Modus gibt es keine Server-Option.
+     */
+    fun serverOptionZuletztAktiv(): Boolean =
+        mode == DataSourceMode.DEMO || prefs.getBoolean(breiWasserCacheKey(), false)
 
     /** Cache nach erfolgreichem `?action=heute` aktualisieren (nicht im Demo). */
     fun merkeBreiWasserAktiv(aktiv: Boolean) {

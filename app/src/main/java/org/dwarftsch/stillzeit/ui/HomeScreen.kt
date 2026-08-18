@@ -306,7 +306,12 @@ private fun Inhalt(
                 val tag = tagesLabel(eintrag.createTime)
                 if (tag != letzterTag) {
                     letzterTag = tag
-                    item(key = "tag-$tag") { TagesUeberschrift(tag) }
+                    // Schlüssel über die Eintrags-ID, nicht über das Tages-
+                    // Label: taucht derselbe Tag (etwa bei nachgetragenen
+                    // Uhrzeiten) in zwei Blöcken auf, wäre ein Label-Schlüssel
+                    // doppelt – LazyColumn wirft darauf eine Exception und die
+                    // App stürzt beim Aufbau der Liste ab.
+                    item(key = "tag-${eintrag.id}") { TagesUeberschrift(tag) }
                 }
                 item(key = "eintrag-${eintrag.id}") {
                     EintragsKachel(
