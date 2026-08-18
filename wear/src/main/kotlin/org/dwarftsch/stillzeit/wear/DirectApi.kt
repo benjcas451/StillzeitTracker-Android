@@ -44,17 +44,9 @@ class DirectApi(private val verbindung: ServerConnection) {
     fun eintraege(): List<WatchEntry> {
         val antwort = anfrage("GET", url(), null)
         val liste = WatchEntry.listeAusJson(antwort.optJSONArray("entries"))
-        return liste.take(MAX_EINTRAEGE)
-    }
-
-    /**
-     * Stand der Server-Option „Brei & Wasser“ (aus `?action=heute`).
-     * Tolerant gelesen, weil PHP das Flag als Bool oder 0/1 liefern kann.
-     */
-    fun breiWasserAktiv(): Boolean {
-        val antwort = anfrage("GET", url("action=heute"), null)
-        return antwort.optBoolean("brei_wasser_aktiv", false) ||
-            antwort.optInt("brei_wasser_aktiv", 0) != 0
+        // Die API garantiert keine Reihenfolge; die Uhr zeigt den ersten
+        // Eintrag als „letzten“ an, deshalb hier selbst sortieren.
+        return liste.sortedByDescending { it.zeit }.take(MAX_EINTRAEGE)
     }
 
     fun anlegen(

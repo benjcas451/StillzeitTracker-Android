@@ -78,7 +78,9 @@ Telefon zeigt sie „Handy nicht erreichbar“ und einen Reconnect-Button.
 Manuell per *workflow_dispatch*. Ein Lauf:
 
 1. baut signierte **APKs** (Telefon + Wear) und hängt sie an ein
-   GitHub-Release (`v<version>-<run_number>`) — direkt installierbar,
+   GitHub-Release (`v<version>-<run_number>`) — direkt installierbar; die
+   `<version>` liest der Workflow aus `app/build.gradle.kts`, sie darf also
+   nirgends im Workflow doppelt gepflegt werden,
 2. baut zusätzlich **App Bundles** und lädt sie in die Play-Tracks —
    nur wenn der Schalter `play_upload` (Default: an) gesetzt ist.
 
@@ -138,8 +140,10 @@ Antwort:  {"ok": true, "data": { ... }}  bzw.  {"ok": false, "error": "..."}
 ```
 
 Aktionen: `getConnection` (überträgt die Server-Konfiguration des Telefons
-an die Uhr, bei mTLS inkl. PEM als Base64), `getDashboard` (letzte 12
-Einträge), `createEntry`, `updateEntry`. Das Telefon meldet die Capability
+an die Uhr, bei mTLS inkl. PEM als Base64, dazu `brei_wasser_aktiv` als
+Opt-in-Stand des Telefons), `getDashboard` (letzte 12 Einträge, neueste
+zuerst, plus `brei_wasser_aktiv`), `createEntry`, `updateEntry`. Das
+Telefon meldet die Capability
 `stillzeit_phone_app` (res/values/wear.xml). **Dieses Protokoll ist
 byte-identisch zur iOS/watchOS-Strecke** — Änderungen immer in beiden
 Repos nachziehen.
@@ -161,15 +165,26 @@ Eintrag: `id`, `create_time` (ISO 8601 mit Zeitzonen-Offset), `seite`
 (`Links`/`Rechts`/`Beidseitig`/`Flasche` sowie `Brei`/`Wasser`, wenn die
 pro Familie schaltbare Server-Option aktiv ist — `?action=heute` liefert
 `brei_wasser_aktiv` und die Zusatzfelder `brei`, `wasser`, `total_g_brei`,
-`total_ml_wasser`; `gesamt` zählt weiterhin nur Milchmahlzeiten — in der
-App zusätzlich lokales Opt-in unter Einstellungen → „Brei & Wasser“,
-Default aus), `menge`
+`total_ml_wasser`; `gesamt` zählt weiterhin nur Milchmahlzeiten), `menge`
 (Flasche/Wasser in ml, Brei in g), `einheit` (`ml`/`g`/null),
 `flaschen_art` (`Pre`/`Mutter`, nur Flasche), `dauer_minuten` (nur
 Still-Einträge). Fehler: `{"error": "..."}` mit passendem HTTP-Status.
 Die Query-Form (`?id=42`) ist Absicht — sie funktioniert auf allen Hosts
 inklusive der Legacy-Route ohne `/api/`. Die lokale Tabelle `entries`
 spiegelt exakt dieses Modell.
+
+## Sichtbarkeit von „Brei & Wasser“
+
+Über die beiden Erfassungs-Buttons entscheidet **allein** das lokale Opt-in
+unter Einstellungen → „Brei & Wasser“ (Default aus) — in jedem Modus, auf
+Telefon und Uhr. Die Uhr bekommt den Stand per `getDashboard` (Relay) bzw.
+beim Verbindungsimport (Direktmodus).
+
+`brei_wasser_aktiv` aus `?action=heute` ist seit 2.2.1 nur noch ein
+**Hinweis**: Ist es aus, warnen die Einstellungen, dass der Server Einträge
+ablehnen könnte — verstecken die Buttons aber nicht mehr. Bis 2.2.0 waren
+beide Bedingungen UND-verknüpft; Server, die das Flag gar nicht liefern,
+machten den Schalter damit wirkungslos.
 
 ## Design-System „Minze & Honig“ (v1.0)
 

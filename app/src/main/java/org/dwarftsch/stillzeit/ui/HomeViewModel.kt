@@ -99,14 +99,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.fold(
                 onSuccess = { (stats, eintraege) ->
+                    // Server-Stand nur noch merken (Hinweis in den
+                    // Einstellungen) – über die Sichtbarkeit entscheidet
+                    // allein das lokale Opt-in.
                     settings.merkeBreiWasserAktiv(stats.breiWasserAktiv)
-                    // Sichtbar nur, wenn auch das lokale Opt-in aktiv ist –
-                    // die Server-Option allein blendet nichts ein.
-                    val sichtbar = stats.breiWasserAktiv && settings.breiWasserAktiviert
+                    val sichtbar = settings.breiWasserAktiviert
                     state.value = state.value.copy(
                         laedt = false,
                         stats = stats.copy(breiWasserAktiv = sichtbar),
-                        eintraege = eintraege,
+                        // Nach Zeitpunkt sortiert: die Tagesüberschriften der
+                        // Liste setzen eine chronologische Reihenfolge voraus.
+                        // Doppelte IDs (fehlerhafte Serverantwort) fliegen
+                        // raus – LazyColumn verlangt eindeutige Schlüssel.
+                        eintraege = eintraege
+                            .distinctBy { it.id }
+                            .sortedByDescending { it.createTime },
                         breiWasserAktiv = sichtbar,
                     )
                 },

@@ -128,8 +128,8 @@ class WearRequestService : WearableListenerService() {
      * der lokalen SQLite-Quelle gibt es nichts zu übernehmen — die Uhr bleibt
      * dann beim Weg über das Telefon.
      */
-    private suspend fun verbindung(settings: AppSettings, certSource: CertSource): JSONObject =
-        when (settings.mode) {
+    private suspend fun verbindung(settings: AppSettings, certSource: CertSource): JSONObject {
+        val daten = when (settings.mode) {
             DataSourceMode.DEMO -> JSONObject().put("mode", "demo")
 
             DataSourceMode.API_KEY -> {
@@ -154,6 +154,11 @@ class WearRequestService : WearableListenerService() {
                     .put("client_key", Base64.encodeToString(key, Base64.NO_WRAP))
             }
         }
+        // Das lokale Opt-in wandert mit: im Direktmodus fragt die Uhr das
+        // Telefon nicht mehr, und die Server-Option allein darf die beiden
+        // Buttons nicht mehr unterdrücken.
+        return daten.put("brei_wasser_aktiv", settings.breiWasserAktiviert)
+    }
 
     private fun pruefeBaseUrl(baseUrl: String) {
         if (baseUrl.isEmpty()) {
@@ -172,26 +177,16 @@ class WearRequestService : WearableListenerService() {
     }
 
     private suspend fun dashboard(service: EntryService, settings: AppSettings): JSONObject {
-        val eintraege = service.getEntries().take(12)
+        // Neueste zuerst: die Uhr zeigt den ersten Eintrag als „letzten“ an,
+        // die REST-API garantiert aber keine Reihenfolge.
+        val eintraege = service.getEntries().sortedByDescending { it.createTime }.take(12)
         return JSONObject()
             .put("entries", JSONArray().apply { eintraege.forEach { put(alsJson(it)) } })
-            .put("brei_wasser_aktiv", breiWasserAktiv(service, settings))
-    }
-
-    /**
-     * Sichtbarkeit für die Uhr: lokales Opt-in des Telefons UND (in den
-     * Server-Modi) die Server-Option – frisch vom Server geholt und dabei
-     * der Telefon-Cache aktualisiert; schlägt die Abfrage fehl, gilt der
-     * letzte bekannte Wert.
-     */
-    private suspend fun breiWasserAktiv(service: EntryService, settings: AppSettings): Boolean {
-        if (!settings.breiWasserAktiviert) return false
-        return when (settings.mode) {
-            DataSourceMode.DEMO -> true
-            else -> runCatching { service.getToday().breiWasserAktiv }
-                .onSuccess { settings.merkeBreiWasserAktiv(it) }
-                .getOrElse { settings.breiWasserAktivFuerAktuellenZugang() }
-        }
+            // Wie auf dem Telefon: allein das lokale Opt-in entscheidet. Der
+            // frühere zusätzliche `?action=heute`-Roundtrip entfällt damit –
+            // er kostete pro Uhr-Aktion eine Anfrage und konnte die Buttons
+            // trotz aktivem Schalter unterdrücken.
+            .put("brei_wasser_aktiv", settings.breiWasserAktiviert)
     }
 
     private fun alsJson(entry: Entry): JSONObject = JSONObject().apply {

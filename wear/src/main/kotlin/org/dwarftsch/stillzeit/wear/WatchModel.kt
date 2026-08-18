@@ -28,7 +28,7 @@ class WatchModel(context: Context) {
     private val store = ServerConnectionStore(context)
     private val hintergrund = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
-    // Letzter bekannter Stand der Server-Option „Brei & Wasser“, damit die
+    // Letzter bekannter Stand des Telefon-Opt-ins „Brei & Wasser“, damit die
     // Buttons schon vor der ersten Antwort richtig stehen. Der Wert gilt je
     // Quelle (Relay bzw. Basis-URL der Direktverbindung).
     private val flagPrefs =
@@ -51,7 +51,11 @@ class WatchModel(context: Context) {
     var verbindung by mutableStateOf<ServerConnection?>(null)
         private set
 
-    /** Server-Option „Brei & Wasser“ – blendet die zwei Extra-Buttons ein. */
+    /**
+     * Opt-in „Brei & Wasser“ des Telefons – blendet die zwei Extra-Buttons
+     * ein. Kommt über `getDashboard` (Relay) bzw. beim Verbindungsimport
+     * (Direktmodus) und wird bis dahin aus [flagPrefs] vorbelegt.
+     */
     var breiWasserAktiv by mutableStateOf(false)
         private set
 
@@ -126,13 +130,16 @@ class WatchModel(context: Context) {
 
     private fun uebernehmen(daten: JSONObject) {
         val neu = ServerConnection.ausAntwort(daten)
+        // Opt-in „Brei & Wasser“ des Telefons; tolerant gelesen (Bool oder 0/1).
+        val breiWasser = daten.optBoolean("brei_wasser_aktiv", false) ||
+            daten.optInt("brei_wasser_aktiv", 0) != 0
         if (neu == null) {
             laedt = false
             fehler = "Auf dem Handy ist keine Server-Verbindung eingerichtet."
             return
         }
         if (!neu.istMtls) {
-            speichern(neu)
+            speichern(neu, breiWasser)
             return
         }
         // Das Client-Zertifikat sofort prüfen: ein unbrauchbarer Schlüssel soll
@@ -143,7 +150,7 @@ class WatchModel(context: Context) {
             }
             main.post {
                 ergebnis.fold(
-                    onSuccess = { speichern(neu) },
+                    onSuccess = { speichern(neu, breiWasser) },
                     onFailure = { fehlgeschlagen ->
                         laedt = false
                         fehler = fehlgeschlagen.message ?: "Client-Zertifikat unbrauchbar."
@@ -153,11 +160,13 @@ class WatchModel(context: Context) {
         }
     }
 
-    private fun speichern(neu: ServerConnection) {
+    private fun speichern(neu: ServerConnection, breiWasser: Boolean) {
         store.speichern(neu)
         verbindung = neu
         fehler = null
-        breiWasserAktiv = flagPrefs.getBoolean(flagKey(), false)
+        // Erst nach dem Setzen von `verbindung`: der Schlüssel hängt an der
+        // Basis-URL der frisch übernommenen Verbindung.
+        merkeBreiWasser(breiWasser)
         // Eine eigene Erfolgsmeldung erübrigt sich: die Statuszeile zeigt ab
         // jetzt „Direkt · …“ statt „Über Handy“.
         aktualisieren()
@@ -199,14 +208,11 @@ class WatchModel(context: Context) {
             try {
                 when (aktion) {
                     Aktion.Laden -> {
+                        // Kein zusätzliches `?action=heute` mehr: über die
+                        // Sichtbarkeit entscheidet das beim Import übernommene
+                        // Opt-in des Telefons, nicht die Server-Option.
                         val liste = api.eintraege()
-                        // Flag tolerant mitholen: schlägt nur diese Abfrage
-                        // fehl, bleibt der letzte bekannte Stand gültig.
-                        val aktiv = runCatching { api.breiWasserAktiv() }.getOrNull()
-                        main.post {
-                            aktiv?.let(::merkeBreiWasser)
-                            fertig(liste)
-                        }
+                        main.post { fertig(liste) }
                     }
 
                     is Aktion.Anlegen -> {
