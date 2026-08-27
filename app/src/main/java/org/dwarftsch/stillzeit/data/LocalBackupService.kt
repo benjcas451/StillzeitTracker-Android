@@ -44,6 +44,33 @@ object LocalBackupService {
     }
 
     /**
+     * Obergrenze für eine eingelesene Backup-Datei. Ein Backup dieser App
+     * bleibt weit darunter. Die Grenze verhindert, dass eine versehentlich
+     * gewählte Riesendatei beim Import den Arbeitsspeicher sprengt: Datei →
+     * String → JSON-Baum belegt ein Vielfaches der Dateigröße, und das
+     * System beendet die App dann ohne Rückfrage.
+     */
+    const val MAX_BACKUP_BYTES = 16 * 1024 * 1024
+
+    /** Liest den Strom vollständig, bricht aber über [MAX_BACKUP_BYTES] ab. */
+    fun leseBegrenzt(strom: java.io.InputStream): String {
+        val puffer = java.io.ByteArrayOutputStream()
+        val block = ByteArray(64 * 1024)
+        while (true) {
+            val gelesen = strom.read(block)
+            if (gelesen < 0) break
+            if (puffer.size() + gelesen > MAX_BACKUP_BYTES) {
+                throw IllegalArgumentException(
+                    "Die Datei ist größer als ${MAX_BACKUP_BYTES / (1024 * 1024)} MB " +
+                        "und damit kein Backup dieser App.",
+                )
+            }
+            puffer.write(block, 0, gelesen)
+        }
+        return puffer.toString(Charsets.UTF_8.name())
+    }
+
+    /**
      * Prüft ein Backup und liefert die Zeilen passend zum Tabellenschema.
      * Wirft [IllegalArgumentException] mit sprechender Meldung bei Problemen.
      */

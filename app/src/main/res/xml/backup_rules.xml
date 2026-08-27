@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   Auto-Backup fuer Geraete bis Android 11 (API 30). Dort gibt es nur das
+   Cloud-Backup, keinen getrennten Geraete-Transfer - gesichert werden
+   deshalb ausschliesslich die Nutzdaten (SQLite).
+
+   stillzeit_settings.xml bleibt bewusst aussen vor: darin stehen der
+   API-Key und die geraetegebundene SAF-URI (siehe data_extraction_rules.xml).
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <include domain="database" path="." />
 </full-backup-content>

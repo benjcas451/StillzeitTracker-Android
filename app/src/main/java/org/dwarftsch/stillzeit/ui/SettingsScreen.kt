@@ -216,7 +216,7 @@ fun SettingsScreen(
                 runCatching {
                     val text = withContext(Dispatchers.IO) {
                         context.contentResolver.openInputStream(uri)?.use {
-                            it.readBytes().toString(Charsets.UTF_8)
+                            LocalBackupService.leseBegrenzt(it)
                         } ?: error("Datei ließ sich nicht lesen.")
                     }
                     val rows = LocalBackupService.parseUndValidiere(text)
