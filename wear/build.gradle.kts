@@ -24,7 +24,7 @@ val wearVersionCodeOffset = 1000
 android {
     namespace = "org.dwarftsch.stillzeit.wear"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {
@@ -34,7 +34,11 @@ android {
         applicationId = "org.dwarftsch.stillzeit"
         // Wear OS 3 (API 30) ist die aelteste Version mit aktuellem Play-Support.
         minSdk = 30
-        targetSdk = 36
+        // Gleichstand mit dem :app-Modul. Play warnt sonst fuer die
+        // Wear-Variante, dass sie eine veraltete API-Version anspricht:
+        // die Uhr-App blieb beim Umzug aus dem Flutter-Repo auf 36 stehen,
+        // waehrend die Handy-App auf 37 ging.
+        targetSdk = 37
         versionCode = wearVersionCodeOffset +
             ((findProperty("buildNumber") as String?)?.toIntOrNull() ?: 18)
         versionName = "2.2.1"
