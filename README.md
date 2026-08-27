@@ -111,6 +111,41 @@ Update bleiben alle Nutzerdaten erhalten:
   (Keys mit Präfix `flutter.`) in die nativen Prefs, siehe `AppSettings`.
 - **SAF-Berechtigung** des Zertifikats-Ordners überlebt das Update.
 
+## Sicherung & Gerätewechsel (Auto-Backup / D2D)
+
+`app/src/main/res/xml/data_extraction_rules.xml` (API 31+) und
+`backup_rules.xml` (bis API 30) sind bewusst als **Whitelist** gepflegt —
+sobald ein `<include>` gesetzt ist, wandert ausschließlich das Aufgeführte
+mit. Vorher standen dort die unveränderten Android-Studio-Vorlagen, also
+komplett auskommentiert und ohne `<device-transfer>`; damit war ungeregelt,
+was in ein Cloud-Backup geht.
+
+| | Cloud-Backup | Geräte-Transfer (D2D) |
+|---|---|---|
+| Einträge (`stillzeit_demo.db`) | ✅ | ✅ |
+| `stillzeit_settings.xml` (Server-URL, **API-Key**) | ❌ | ✅ |
+
+Begründung: Das Cloud-Backup liegt bei Google, der Geräte-Transfer läuft
+Ende-zu-Ende-verschlüsselt direkt zwischen zwei Geräten. Der API-Key steht
+im Klartext in den Prefs und hat auf fremden Servern nichts zu suchen —
+nach einer Cloud-Wiederherstellung sind die Einträge da, Server-Adresse und
+Key müssen aber neu eingetragen werden.
+
+Eingebunden wird jeweils der **ganze** Datenbank-Ordner (`domain="database"
+path="."`), nicht nur die `.db`-Datei: SQLite läuft im WAL-Modus, ohne
+`-wal` käme ein veralteter Stand zurück.
+
+`cert_folder_uri` (SAF-Ordner der mTLS-Zertifikate) ist in beiden Fällen
+wertlos — die persistierte Leseberechtigung gilt nur auf dem Gerät, das sie
+erteilt hat. `CertSource` prüft `persistedUriPermissions` und fragt den
+Ordner sauber neu ab.
+
+Beim Ändern der Regeln daran denken: **jedes neue `<include>` erweitert die
+Whitelist, jede neue Prefs-Datei fehlt sonst stillschweigend.**
+
+Die In-App-Erklärung dazu steht in `DB_INFO_TEXT` (Einstellungen → „Aufbau
+Datenbank“) und muss mitgezogen werden.
+
 ## Architektur (`:app`)
 
 ```
@@ -121,7 +156,7 @@ data/ApiService.kt           REST-Client (OkHttp; PATCH + mTLS)
 data/ClientCertificates.kt   PEM (crt/key) -> SSLSocketFactory, inkl. PKCS#1->#8
 data/CertSource.kt           SAF-Ordner mit client.crt/client.key
 data/AppSettings.kt          Prefs + Flutter-Migration
-data/LocalBackupService.kt   JSON-Backup (Format kompatibel zu iOS/Flutter)
+data/LocalBackupService.kt   JSON-Backup, Format kompatibel zu iOS/Flutter (Import max. 16 MB)
 wear/WearRequestService.kt   Data-Layer-RPC-Endpunkt für die Uhr
 ui/…                         Compose-UI (Theme, Home, Settings, Dialoge)
 ```

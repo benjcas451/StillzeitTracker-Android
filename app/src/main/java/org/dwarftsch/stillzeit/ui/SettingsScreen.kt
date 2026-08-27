@@ -82,7 +82,10 @@ Endpunkte:
   Alle Einträge: {"entries": [...]}
 
 • GET <Basis-URL>?action=heute
-  Tagesstatistik: gesamt, links, rechts, beidseitig, flasche, total_ml, total_minuten
+  Tagesstatistik: gesamt, links, rechts, beidseitig, flasche, total_ml, total_minuten.
+  Dazu die Brei-/Wasser-Felder brei, wasser, total_g_brei, total_ml_wasser sowie
+  brei_wasser_aktiv (Stand der Server-Option). "gesamt" zählt weiterhin nur
+  Milchmahlzeiten, Brei und Wasser bleiben also außen vor.
 
 • GET <Basis-URL>?action=last
   Letzter Eintrag (oder leeres Objekt)
@@ -137,6 +140,20 @@ Tabelle "entries":
   INTEGER, optionale Stilldauer in Minuten – nur bei Links/Rechts/Beidseitig gesetzt, sonst NULL
 
 Die Server-API verwendet dasselbe Datenmodell, Einträge sind also identisch aufgebaut (id, create_time, seite, menge, flaschen_art, dauer_minuten).
+
+Sicherung & Gerätewechsel
+
+Android sichert die App automatisch. Was dabei mitgeht, legt die App bewusst unterschiedlich fest:
+
+• Cloud-Backup (über das Google-Konto)
+  Nur die Einträge (SQLite). Die Einstellungen bleiben außen vor, weil dort der API-Key steht – der soll nicht auf fremde Server. Nach einer Wiederherstellung aus der Cloud sind also alle Einträge da, Server-Adresse und API-Key müssen aber neu eingetragen werden.
+
+• Direkter Gerätewechsel (altes Gerät → neues Gerät)
+  Zusätzlich die Einstellungen inklusive API-Key. Diese Übertragung läuft Ende-zu-Ende-verschlüsselt unmittelbar zwischen den beiden Geräten.
+
+Den Zertifikats-Ordner für mTLS muss man in beiden Fällen neu auswählen: die Leseberechtigung darauf gilt nur auf dem Gerät, auf dem sie erteilt wurde, und lässt sich technisch nicht mitnehmen.
+
+Davon unabhängig bleibt das manuelle JSON-Backup weiter unten – es nimmt die Einträge mit, egal wohin. Beim Wiederherstellen sind Dateien bis 16 MB zulässig; alles darüber lehnt die App ab, statt beim Einlesen den Arbeitsspeicher zu sprengen.
 """
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
