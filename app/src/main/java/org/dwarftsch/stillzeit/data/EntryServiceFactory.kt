@@ -14,6 +14,9 @@ fun createConfiguredEntryService(context: Context, settings: AppSettings, certSo
         DataSourceMode.API -> ApiService(
             certSource = certSource,
             baseUrl = settings.apiBaseUrl,
+            // Optional: manche Server verlangen zusätzlich zum Zertifikat
+            // einen API-Key. Leer bedeutet „nur mTLS“.
+            apiKey = settings.mtlsApiKey.ifEmpty { null },
         )
         DataSourceMode.API_KEY -> ApiService(
             baseUrl = settings.apiKeyBaseUrl,

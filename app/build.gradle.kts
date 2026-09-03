@@ -34,7 +34,7 @@ android {
         // -PbuildNumber=100+run_number (siehe .github/workflows/build-aab.yml),
         // lokal gilt der Fallback.
         versionCode = (findProperty("buildNumber") as String?)?.toIntOrNull() ?: 18
-        versionName = "2.2.1"
+        versionName = "2.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

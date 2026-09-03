@@ -152,6 +152,9 @@ class WearRequestService : WearableListenerService() {
                     .put("base_url", baseUrl)
                     .put("client_cert", Base64.encodeToString(cert, Base64.NO_WRAP))
                     .put("client_key", Base64.encodeToString(key, Base64.NO_WRAP))
+                    // Optionaler Zusatz-Key: fehlt er, bleibt das Feld leer und
+                    // die Uhr spricht wie bisher rein per Zertifikat.
+                    .put("api_key", settings.mtlsApiKey)
             }
         }
         // Das lokale Opt-in wandert mit: im Direktmodus fragt die Uhr das
