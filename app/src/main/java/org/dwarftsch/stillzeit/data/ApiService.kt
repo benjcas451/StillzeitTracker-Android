@@ -22,16 +22,20 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Spricht die Stillzeit-Tracker-REST-API an. Authentifizierung wahlweise per
- * mTLS-Client-Zertifikat ([certSource]) oder API-Key ([apiKey], gesendet als
- * `X-API-Key`-Header). Endpunkte und JSON-Felder identisch zur Flutter-App.
+ * Spricht die Stillzeit-Tracker-REST-API an. Authentifizierung per
+ * mTLS-Client-Zertifikat ([certSource]), per API-Key ([apiKey], gesendet als
+ * `X-API-Key`-Header) oder per beidem zugleich. Endpunkte und JSON-Felder
+ * identisch zur Flutter-App.
  */
 class ApiService(
-    /** Quelle für client.crt/client.key; null bei API-Key-Authentifizierung. */
+    /** Quelle für client.crt/client.key; null ohne Client-Zertifikat. */
     private val certSource: CertSource? = null,
     /** Basis-URL inkl. abschließendem Slash, z. B. `https://host/stillzeit-tracker/api/`. */
     private val baseUrl: String,
-    /** Wird als `X-API-Key`-Header mitgesendet, falls gesetzt. */
+    /**
+     * Wird als `X-API-Key`-Header mitgesendet, falls gesetzt – auch zusätzlich
+     * zu einem Client-Zertifikat.
+     */
     private val apiKey: String? = null,
 ) : EntryService {
 

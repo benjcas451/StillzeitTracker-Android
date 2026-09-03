@@ -11,7 +11,10 @@ import org.json.JSONObject
 data class ServerConnection(
     /** Basis-URL inklusive abschließendem Slash. */
     val baseUrl: String,
-    /** Wird als `X-API-Key` mitgesendet; null im mTLS-Modus. */
+    /**
+     * Wird als `X-API-Key` mitgesendet; im mTLS-Modus optional (nur, wenn der
+     * Server zusätzlich zum Zertifikat einen Key verlangt).
+     */
     val apiKey: String?,
     /** PEM-Bytes des Client-Zertifikats; null im API-Key-Modus. */
     val clientCertPem: ByteArray?,
@@ -21,7 +24,11 @@ data class ServerConnection(
     val istMtls: Boolean get() = clientCertPem != null && clientKeyPem != null
 
     /** Kurzbeschreibung für die Statusanzeige auf der Uhr. */
-    val beschreibung: String get() = if (istMtls) "Direkt · mTLS" else "Direkt · API-Key"
+    val beschreibung: String get() = when {
+        istMtls && apiKey != null -> "Direkt · mTLS + Key"
+        istMtls -> "Direkt · mTLS"
+        else -> "Direkt · API-Key"
+    }
 
     // baseUrl identifiziert die Verbindung ausreichend; die Byte-Arrays aus
     // equals/hashCode herauszuhalten erspart das fehleranfällige Vergleichen
@@ -51,7 +58,10 @@ data class ServerConnection(
                     val cert = daten.optString("client_cert").entschluesselt()
                     val key = daten.optString("client_key").entschluesselt()
                     if (baseUrl.isEmpty() || cert == null || key == null) return null
-                    ServerConnection(mitSlash(baseUrl), null, cert, key)
+                    // Zusatz-Key optional: ältere Telefon-Versionen senden das
+                    // Feld gar nicht, dann bleibt es wie bisher bei reinem mTLS.
+                    val zusatzKey = daten.optString("api_key").takeIf { it.isNotEmpty() }
+                    ServerConnection(mitSlash(baseUrl), zusatzKey, cert, key)
                 }
 
                 else -> null

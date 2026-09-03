@@ -123,7 +123,7 @@ was in ein Cloud-Backup geht.
 | | Cloud-Backup | Geräte-Transfer (D2D) |
 |---|---|---|
 | Einträge (`stillzeit_demo.db`) | ✅ | ✅ |
-| `stillzeit_settings.xml` (Server-URL, **API-Key**) | ❌ | ✅ |
+| `stillzeit_settings.xml` (Server-URL, **API-Keys**) | ❌ | ✅ |
 
 Begründung: Das Cloud-Backup liegt bei Google, der Geräte-Transfer läuft
 Ende-zu-Ende-verschlüsselt direkt zwischen zwei Geräten. Der API-Key steht
@@ -162,7 +162,11 @@ ui/…                         Compose-UI (Theme, Home, Settings, Dialoge)
 ```
 
 **Datenquellen (vom Nutzer wählbar):** Server per mTLS-Client-Zertifikat,
-Server per API-Key (`X-API-Key`-Header) oder lokale SQLite ohne Sync.
+Server per API-Key (`X-API-Key`-Header) oder lokale SQLite ohne Sync. Im
+mTLS-Modus lässt sich seit 2.2.2 **zusätzlich** ein API-Key hinterlegen
+(Prefs-Schlüssel `mtls_api_key`, getrennt von `api_key` des API-Key-Modus) —
+für Server, die beides prüfen. Bleibt das Feld leer, geht wie bisher kein
+`X-API-Key`-Header raus.
 
 ## Watch-Protokoll (Data-Layer-API)
 
@@ -175,11 +179,11 @@ Antwort:  {"ok": true, "data": { ... }}  bzw.  {"ok": false, "error": "..."}
 ```
 
 Aktionen: `getConnection` (überträgt die Server-Konfiguration des Telefons
-an die Uhr, bei mTLS inkl. PEM als Base64, dazu `brei_wasser_aktiv` als
-Opt-in-Stand des Telefons), `getDashboard` (letzte 12 Einträge, neueste
-zuerst, plus `brei_wasser_aktiv`), `createEntry`, `updateEntry`. Das
-Telefon meldet die Capability
-`stillzeit_phone_app` (res/values/wear.xml). **Dieses Protokoll ist
+an die Uhr, bei mTLS inkl. PEM als Base64 und – falls hinterlegt – dem
+zusätzlichen `api_key`, dazu `brei_wasser_aktiv` als Opt-in-Stand des
+Telefons), `getDashboard` (letzte 12 Einträge, neueste zuerst, plus
+`brei_wasser_aktiv`), `createEntry`, `updateEntry`. Das Telefon meldet die
+Capability `stillzeit_phone_app` (res/values/wear.xml). **Dieses Protokoll ist
 byte-identisch zur iOS/watchOS-Strecke** — Änderungen immer in beiden
 Repos nachziehen.
 

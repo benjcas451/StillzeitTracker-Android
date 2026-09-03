@@ -41,9 +41,21 @@ class AppSettings(context: Context) {
         get() = DataSourceMode.fromGespeichert(prefs.getString(KEY_MODE, null))
         set(value) = prefs.edit().putString(KEY_MODE, value.gespeichert).apply()
 
+    /** API-Key für den Modus [DataSourceMode.API_KEY]; leer, wenn keiner hinterlegt ist. */
     var apiKey: String
         get() = prefs.getString(KEY_API_KEY, "").orEmpty()
         set(value) = prefs.edit().putString(KEY_API_KEY, value.trim()).apply()
+
+    /**
+     * Optionaler API-Key **zusätzlich** zum Client-Zertifikat im Modus
+     * [DataSourceMode.API]. Manche Server prüfen beides: mTLS sichert den
+     * Transportweg, der Key identifiziert darüber hinaus den Zugang. Eigener
+     * Schlüssel, damit der Wechsel zwischen den beiden Server-Modi nicht den
+     * jeweils anderen Key überschreibt.
+     */
+    var mtlsApiKey: String
+        get() = prefs.getString(KEY_MTLS_API_KEY, "").orEmpty()
+        set(value) = prefs.edit().putString(KEY_MTLS_API_KEY, value.trim()).apply()
 
     /** Basis-URL der mTLS-API; leer, solange keine hinterlegt ist. */
     var apiBaseUrl: String
@@ -128,6 +140,7 @@ class AppSettings(context: Context) {
     private companion object {
         const val KEY_MODE = "data_source_mode"
         const val KEY_API_KEY = "api_key"
+        const val KEY_MTLS_API_KEY = "mtls_api_key"
         const val KEY_API_BASE_URL = "api_base_url"
         const val KEY_API_KEY_BASE_URL = "api_key_base_url"
         const val KEY_CERT_FOLDER_URI = "cert_folder_uri"

@@ -109,7 +109,7 @@ Endpunkte:
 Gültige Werte für "seite": Links, Rechts, Beidseitig, Flasche sowie – wenn die Server-Option "Brei & Wasser" der Familie aktiv ist (?action=heute liefert "brei_wasser_aktiv") – Brei und Wasser.
 
 Authentifizierung je nach Datenquelle:
-• Server (mTLS-API): Client-Zertifikat (client.crt + client.key)
+• Server (mTLS-API): Client-Zertifikat (client.crt + client.key), optional zusätzlich der Header "X-API-Key: <Key>"
 • Server (API-Key): HTTP-Header "X-API-Key: <Key>"
 
 Ein Eintrag hat die Felder id, create_time, seite, menge (bei Flasche/Wasser in ml, bei Brei in g), einheit ("ml", "g" oder null), flaschen_art (Pre oder Mutter, nur bei Flasche) und dauer_minuten (optionale Stilldauer in Minuten, nur bei Links/Rechts/Beidseitig). Fehler kommen als {"error": "..."} mit passendem HTTP-Statuscode.
@@ -171,7 +171,7 @@ fun SettingsScreen(
     var apiUrl by remember { mutableStateOf(settings.apiBaseUrl) }
     var apiKeyUrl by remember { mutableStateOf(settings.apiKeyBaseUrl) }
     var apiKey by remember { mutableStateOf(settings.apiKey) }
-    var apiKeySichtbar by remember { mutableStateOf(false) }
+    var mtlsApiKey by remember { mutableStateOf(settings.mtlsApiKey) }
     var certsOk by remember { mutableStateOf(false) }
     var beschaeftigt by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -296,32 +296,13 @@ fun SettingsScreen(
                     settings.apiKeyBaseUrl = it
                 })
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = {
+                ApiKeyFeld(
+                    wert = apiKey,
+                    hinweis = "Empfohlen. Ohne API-Key nur für interne Testzwecke.",
+                    onAenderung = {
                         apiKey = it
                         settings.apiKey = it
                     },
-                    shape = MaterialTheme.shapes.medium,
-                    colors = mhEingabefeldFarben(),
-                    label = { Text("API-Key (optional)") },
-                    supportingText = { Text("Empfohlen. Ohne API-Key nur für interne Testzwecke.") },
-                    singleLine = true,
-                    visualTransformation = if (apiKeySichtbar) {
-                        VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
-                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-                    trailingIcon = {
-                        IconButton(onClick = { apiKeySichtbar = !apiKeySichtbar }) {
-                            Icon(
-                                if (apiKeySichtbar) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (apiKeySichtbar) "Verbergen" else "Anzeigen",
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
             }
 
@@ -332,6 +313,18 @@ fun SettingsScreen(
                     apiUrl = it
                     settings.apiBaseUrl = it
                 })
+                Spacer(Modifier.height(16.dp))
+                // Zusätzlich zum Client-Zertifikat: Server, die beides prüfen,
+                // brauchen den Key im X-API-Key-Header. Leer lassen = nur mTLS.
+                ApiKeyFeld(
+                    wert = mtlsApiKey,
+                    hinweis = "Nur nötig, wenn der Server zusätzlich zum " +
+                        "Zertifikat einen Key erwartet. Leer lassen für reines mTLS.",
+                    onAenderung = {
+                        mtlsApiKey = it
+                        settings.mtlsApiKey = it
+                    },
+                )
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -549,6 +542,36 @@ private fun ModusZeile(
             )
         }
     }
+}
+
+/** Eingabefeld für einen API-Key: verdeckt, mit Auge zum Aufdecken. */
+@Composable
+private fun ApiKeyFeld(wert: String, hinweis: String, onAenderung: (String) -> Unit) {
+    var sichtbar by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = wert,
+        onValueChange = onAenderung,
+        shape = MaterialTheme.shapes.medium,
+        colors = mhEingabefeldFarben(),
+        label = { Text("API-Key (optional)") },
+        supportingText = { Text(hinweis) },
+        singleLine = true,
+        visualTransformation = if (sichtbar) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+        trailingIcon = {
+            IconButton(onClick = { sichtbar = !sichtbar }) {
+                Icon(
+                    if (sichtbar) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (sichtbar) "Verbergen" else "Anzeigen",
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+    )
 }
 
 /** Eingabefeld für eine API-Basis-URL. */
