@@ -20,11 +20,25 @@ data class ServerConnection(
     val clientCertPem: ByteArray?,
     /** PEM-Bytes des privaten Schlüssels; null im API-Key-Modus. */
     val clientKeyPem: ByteArray?,
+    /**
+     * Client-ID des Cloudflare Service Tokens; null ausserhalb des
+     * Cloudflare-Modus. Verbindungen, die vor 2.3.0 übernommen wurden, haben
+     * das Feld nicht in der Ablage — es wird dann zu null gelesen.
+     */
+    val cfAccessClientId: String? = null,
+    /** Client-Secret des Cloudflare Service Tokens; null ausserhalb des Modus. */
+    val cfAccessClientSecret: String? = null,
 ) {
     val istMtls: Boolean get() = clientCertPem != null && clientKeyPem != null
 
+    /** Läuft die Verbindung über ein Cloudflare Service Token? */
+    val istCloudflare: Boolean
+        get() = cfAccessClientId != null && cfAccessClientSecret != null
+
     /** Kurzbeschreibung für die Statusanzeige auf der Uhr. */
     val beschreibung: String get() = when {
+        istCloudflare && apiKey != null -> "Direkt · Cloudflare + Key"
+        istCloudflare -> "Direkt · Cloudflare"
         istMtls && apiKey != null -> "Direkt · mTLS + Key"
         istMtls -> "Direkt · mTLS"
         else -> "Direkt · API-Key"
@@ -35,7 +49,9 @@ data class ServerConnection(
     // von Schlüsselmaterial.
     override fun equals(other: Any?): Boolean =
         other is ServerConnection && other.baseUrl == baseUrl &&
-            other.apiKey == apiKey && other.istMtls == istMtls
+            other.apiKey == apiKey && other.istMtls == istMtls &&
+            other.cfAccessClientId == cfAccessClientId &&
+            other.cfAccessClientSecret == cfAccessClientSecret
 
     override fun hashCode(): Int = baseUrl.hashCode()
 
@@ -52,6 +68,17 @@ data class ServerConnection(
                     val key = daten.optString("api_key")
                     if (baseUrl.isEmpty() || key.isEmpty()) return null
                     ServerConnection(mitSlash(baseUrl), key, null, null)
+                }
+
+                "cloudflare" -> {
+                    // Ein halbes Service Token ist so gut wie keines — dann
+                    // lieber weiter über das Telefon, statt am Rand
+                    // abgewiesen zu werden.
+                    val id = daten.optString("cf_access_client_id")
+                    val secret = daten.optString("cf_access_client_secret")
+                    if (baseUrl.isEmpty() || id.isEmpty() || secret.isEmpty()) return null
+                    val zusatzKey = daten.optString("api_key").takeIf { it.isNotEmpty() }
+                    ServerConnection(mitSlash(baseUrl), zusatzKey, null, null, id, secret)
                 }
 
                 "api" -> {
@@ -95,8 +122,11 @@ class ServerConnectionStore(context: Context) {
         val apiKey = prefs.getString(API_KEY, null)?.takeIf { it.isNotEmpty() }
         val cert = prefs.getString(CERT, null).alsBytes()
         val key = prefs.getString(SCHLUESSEL, null).alsBytes()
-        if (apiKey == null && (cert == null || key == null)) return null
-        return ServerConnection(baseUrl, apiKey, cert, key)
+        val cfId = prefs.getString(CF_CLIENT_ID, null)?.takeIf { it.isNotEmpty() }
+        val cfSecret = prefs.getString(CF_CLIENT_SECRET, null)?.takeIf { it.isNotEmpty() }
+        val hatCfToken = cfId != null && cfSecret != null
+        if (apiKey == null && !hatCfToken && (cert == null || key == null)) return null
+        return ServerConnection(baseUrl, apiKey, cert, key, cfId, cfSecret)
     }
 
     fun speichern(verbindung: ServerConnection) {
@@ -105,6 +135,8 @@ class ServerConnectionStore(context: Context) {
             .putString(API_KEY, verbindung.apiKey)
             .putString(CERT, verbindung.clientCertPem.alsText())
             .putString(SCHLUESSEL, verbindung.clientKeyPem.alsText())
+            .putString(CF_CLIENT_ID, verbindung.cfAccessClientId)
+            .putString(CF_CLIENT_SECRET, verbindung.cfAccessClientSecret)
             .apply()
     }
 
@@ -126,5 +158,7 @@ class ServerConnectionStore(context: Context) {
         const val API_KEY = "api_key"
         const val CERT = "client_cert"
         const val SCHLUESSEL = "client_key"
+        const val CF_CLIENT_ID = "cf_access_client_id"
+        const val CF_CLIENT_SECRET = "cf_access_client_secret"
     }
 }

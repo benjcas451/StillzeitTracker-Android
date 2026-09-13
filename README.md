@@ -153,6 +153,12 @@ Models.kt                    Seite/FlaschenArt/Entry/TodayStats, ISO-Parser
 data/EntryService.kt         gemeinsames Interface der Datenquellen
 data/DemoService.kt          lokale SQLite (sqflite-kompatibel)
 data/ApiService.kt           REST-Client (OkHttp; PATCH + mTLS)
+data/Netzfehler.kt           Einordnung: nie gesendet vs. mehrdeutig
+data/OfflineSpeicher.kt      Warteschlange + Lesestand je Zugang (JSON)
+data/OfflineService.kt       Offline-Hülle um die Server-Quelle,
+                             Verbindungswache (ConnectivityManager)
+data/CloudflareServiceToken.kt Service-Token-Header + Erkennung der
+                             Access-Abweisung (Redirect auf die Login-Seite)
 data/ClientCertificates.kt   PEM (crt/key) -> SSLSocketFactory, inkl. PKCS#1->#8
 data/CertSource.kt           SAF-Ordner mit client.crt/client.key
 data/AppSettings.kt          Prefs + Flutter-Migration
@@ -162,11 +168,82 @@ ui/…                         Compose-UI (Theme, Home, Settings, Dialoge)
 ```
 
 **Datenquellen (vom Nutzer wählbar):** Server per mTLS-Client-Zertifikat,
-Server per API-Key (`X-API-Key`-Header) oder lokale SQLite ohne Sync. Im
-mTLS-Modus lässt sich seit 2.2.2 **zusätzlich** ein API-Key hinterlegen
+Server per API-Key (`X-API-Key`-Header), Server hinter Cloudflare Access per
+Service Token oder lokale SQLite ohne Sync.
+
+Im mTLS-Modus lässt sich seit 2.2.2 **zusätzlich** ein API-Key hinterlegen
 (Prefs-Schlüssel `mtls_api_key`, getrennt von `api_key` des API-Key-Modus) —
 für Server, die beides prüfen. Bleibt das Feld leer, geht wie bisher kein
 `X-API-Key`-Header raus.
+
+Der Cloudflare-Modus (seit 2.3.0) sendet `CF-Access-Client-Id` und
+`CF-Access-Client-Secret` (Prefs-Schlüssel `cf_access_client_id`,
+`cf_access_client_secret`). Beide Hälften gehen nur gemeinsam raus — ein
+halbes Token weist Cloudflare genauso ab wie gar keines. Auch hier ist ein
+Zusatz-Key möglich (`cloudflare_api_key`), für Server, die hinter Access
+weiter ihren eigenen Key verlangen.
+
+**Access-Abweisung:** Ohne gültiges Token antwortet Cloudflare nicht mit
+einem Fehler, sondern leitet auf die Login-Seite des Teams um. OkHttp bzw.
+`HttpURLConnection` folgen dem, sodass eine HTML-Seite mit Status 200
+ankommt. `ApiService` und die Uhr erkennen das am Host der finalen Anfrage
+(Subdomain von `cloudflareaccess.com`) bzw. an einem 403 mit `cf-ray`-Header
+und melden es als Token-Problem. Die Uhr behandelt den Fall wie „Server
+nicht erreichbar“ und weicht auf das Telefon aus: die Anfrage wurde am Rand
+abgefangen, hat den Server also nachweislich nie erreicht.
+
+## Offline-Betrieb
+
+Bricht die Verbindung weg, bleibt die App benutzbar. `OfflineService` legt
+sich dafür über die Server-Quelle (nur in den Server-Modi, nicht im Demo).
+
+**Lesen:** Nach jedem erfolgreichen Laden liegt der Stand als JSON in
+`filesDir/offline/`, getrennt nach Einträgen und Statistik (die Oberfläche
+lädt beide nebenläufig). Scheitert das Laden an einem Netzwerkfehler, zeigt
+die App diesen Stand statt einer leeren Liste. Ob die Anfrage ankam, spielt
+beim Lesen keine Rolle.
+
+**Schreiben:** Was nicht rausging, landet in einer Warteschlange und geht
+raus, sobald die Verbindung steht. Entscheidend ist `Netzfehler`:
+
+| Fall | Exception | Verhalten |
+|---|---|---|
+| nie gesendet | `UnknownHostException`, `ConnectException`, `NoRouteToHostException`, `SSLException` | in die Warteschlange |
+| mehrdeutig | `SocketTimeoutException`, jede andere `IOException` | Fehlermeldung wie bisher |
+
+Der Unterschied verhindert Duplikate: Bei einem Abbruch mitten in der
+Übertragung könnte der Server den Eintrag längst haben, ein zweiter Versuch
+legte dann einen zweiten an. Die API kennt keinen Idempotenz-Schlüssel,
+deshalb bleibt es in diesen Fällen bei der Meldung. Alles, was keine
+`IOException` ist (etwa eine `ApiException` mit HTTP-Status), gilt nicht als
+Verbindungsproblem.
+
+**Warteschlange.** Neue Einträge bekommen eine negative lokale ID und
+erscheinen sofort in der Liste (mit Uhr-Symbol). Änderungen und Löschungen an
+einem noch wartenden Eintrag werden direkt in dessen `Anlegen`-Aktion
+eingearbeitet bzw. werfen sie ganz raus — dadurch beziehen sich alle
+`Aendern`/`Loeschen`-Aktionen immer auf echte Server-IDs, und beim Abarbeiten
+kann keine unbekannte ID auftauchen. Solange etwas ansteht, geht auch ein
+neuer Schreibzugriff hinten dran statt am Stau vorbei; sonst käme die
+Reihenfolge durcheinander. Geschrieben wird über eine Nebendatei mit
+anschliessendem Umbenennen, damit ein Absturz mitten im Schreiben nicht die
+halbe Warteschlange hinterlässt.
+
+**Abgearbeitet** wird vor jedem Laden und sobald der `ConnectivityManager`
+wieder ein Netz meldet. Beim ersten Verbindungsfehler bricht der Durchlauf
+ab, der Rest bleibt in der Reihenfolge stehen. Weist der Server eine Aktion
+inhaltlich zurück (etwa ein längst gelöschter Eintrag), fliegt sie raus und
+wird einmal gemeldet — sonst blockierte sie die Warteschlange für immer.
+
+Die Ablage hängt am Zugang (Modus + Basis-URL). Ein Serverwechsel zeigt also
+nicht die Einträge des anderen und lädt keine Warteschlange dorthin hoch, wo
+sie nicht hingehört.
+
+**Die Uhr bleibt aussen vor.** `WearRequestService` holt sich die Quelle ohne
+Offline-Hülle: die Uhr führt eine eigene Outbox und bekäme sonst ein
+„erledigt“ gemeldet, während der Eintrag noch beim Telefon liegt. Scheitert
+die Übertragung, meldet der Service das weiterhin an die Uhr, die den Eintrag
+dann selbst aufbewahrt und erneut schickt.
 
 ## Watch-Protokoll (Data-Layer-API)
 
@@ -179,9 +256,11 @@ Antwort:  {"ok": true, "data": { ... }}  bzw.  {"ok": false, "error": "..."}
 ```
 
 Aktionen: `getConnection` (überträgt die Server-Konfiguration des Telefons
-an die Uhr, bei mTLS inkl. PEM als Base64 und – falls hinterlegt – dem
-zusätzlichen `api_key`, dazu `brei_wasser_aktiv` als Opt-in-Stand des
-Telefons), `getDashboard` (letzte 12 Einträge, neueste zuerst, plus
+an die Uhr, bei mTLS inkl. PEM als Base64, im Cloudflare-Modus inkl.
+`cf_access_client_id`/`cf_access_client_secret`, jeweils – falls hinterlegt –
+mit dem zusätzlichen `api_key`, dazu `brei_wasser_aktiv` als Opt-in-Stand des
+Telefons; ein `mode`, den die Uhr nicht kennt, gilt ihr als „nichts zu
+übernehmen“ und sie bleibt im Relay), `getDashboard` (letzte 12 Einträge, neueste zuerst, plus
 `brei_wasser_aktiv`), `createEntry`, `updateEntry`. Das Telefon meldet die
 Capability `stillzeit_phone_app` (res/values/wear.xml). **Dieses Protokoll ist
 byte-identisch zur iOS/watchOS-Strecke** — Änderungen immer in beiden

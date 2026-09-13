@@ -7,7 +7,8 @@
 
    Cloud-Backup laeuft ueber Google-Server: dorthin gehen nur die Nutzdaten
    (SQLite), nicht aber stillzeit_settings.xml. Diese Datei enthaelt den
-   API-Key (Zugangsdaten) und cert_folder_uri - eine SAF-Ordner-URI, deren
+   API-Key und das Cloudflare Service Token (Zugangsdaten) sowie
+   cert_folder_uri - eine SAF-Ordner-URI, deren
    persistierte Leseberechtigung ein Geraetewechsel ohnehin nicht ueberlebt.
 
    Der Geraete-Transfer laeuft direkt und Ende-zu-Ende-verschluesselt zwischen

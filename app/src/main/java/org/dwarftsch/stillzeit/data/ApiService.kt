@@ -24,8 +24,8 @@ import java.time.format.DateTimeFormatter
 /**
  * Spricht die Stillzeit-Tracker-REST-API an. Authentifizierung per
  * mTLS-Client-Zertifikat ([certSource]), per API-Key ([apiKey], gesendet als
- * `X-API-Key`-Header) oder per beidem zugleich. Endpunkte und JSON-Felder
- * identisch zur Flutter-App.
+ * `X-API-Key`-Header), per Cloudflare Service Token ([cfToken]) oder per
+ * Kombination davon. Endpunkte und JSON-Felder identisch zur Flutter-App.
  */
 class ApiService(
     /** Quelle für client.crt/client.key; null ohne Client-Zertifikat. */
@@ -37,6 +37,8 @@ class ApiService(
      * zu einem Client-Zertifikat.
      */
     private val apiKey: String? = null,
+    /** Cloudflare-Access-Service-Token; null ohne Access davor. */
+    private val cfToken: CloudflareServiceToken? = null,
 ) : EntryService {
 
     private var client: OkHttpClient? = null
@@ -97,11 +99,15 @@ class ApiService(
                 .header("Accept", "application/json")
                 .apply {
                     if (!apiKey.isNullOrEmpty()) header("X-API-Key", apiKey)
+                    cfToken?.anwenden(this)
                 }
                 .method(method, body?.let { anfrageKoerper(it) })
                 .build()
 
             httpClient().newCall(request).execute().use { response ->
+                CloudflareServiceToken.abweisung(response)?.let {
+                    throw ApiException(it, statusCode = response.code)
+                }
                 val text = response.body?.string().orEmpty()
                 val ok = response.code in 200..299
 

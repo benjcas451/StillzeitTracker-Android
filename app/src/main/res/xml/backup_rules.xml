@@ -4,7 +4,8 @@
    deshalb ausschliesslich die Nutzdaten (SQLite).
 
    stillzeit_settings.xml bleibt bewusst aussen vor: darin stehen der
-   API-Key und die geraetegebundene SAF-URI (siehe data_extraction_rules.xml).
+   API-Key, das Cloudflare Service Token und die geraetegebundene SAF-URI
+   (siehe data_extraction_rules.xml).
 -->
 <full-backup-content>
     <include domain="database" path="." />
