@@ -25,7 +25,10 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -273,6 +276,14 @@ private fun Inhalt(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
     ) {
+        // Offline-Hinweis über allem: der Nutzer soll sofort sehen, dass er
+        // zwar weiterarbeiten kann, der Stand aber noch nicht beim Server ist.
+        if (state.offlineGrund != null || state.ausstehend > 0) {
+            item(key = "offline") {
+                OfflineBanner(grund = state.offlineGrund, ausstehend = state.ausstehend)
+                Spacer(Modifier.height(12.dp))
+            }
+        }
         state.stats?.let { stats ->
             item(key = "stats") { StatistikKarte(stats) }
         }
@@ -316,6 +327,7 @@ private fun Inhalt(
                 item(key = "eintrag-${eintrag.id}") {
                     EintragsKachel(
                         eintrag = eintrag,
+                        ausstehend = eintrag.id in state.ausstehendeIds,
                         onBearbeiten = { onBearbeiten(eintrag) },
                         onLoeschen = { onLoeschen(eintrag) },
                     )
@@ -466,6 +478,8 @@ private fun TagesUeberschrift(text: String) {
 @Composable
 private fun EintragsKachel(
     eintrag: Entry,
+    /** Der Eintrag wartet noch auf die Übertragung zum Server. */
+    ausstehend: Boolean,
     onBearbeiten: () -> Unit,
     onLoeschen: () -> Unit,
 ) {
@@ -521,11 +535,22 @@ private fun EintragsKachel(
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(eintrag.titel(), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        hhmm(eintrag.createTime),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            hhmm(eintrag.createTime),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (ausstehend) {
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                Icons.Outlined.Schedule,
+                                contentDescription = "Wartet auf Übertragung",
+                                tint = MinzeHonig.farben.hinweis,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
                 }
                 Text(
                     if (eintrag.seite.hatMenge) {
@@ -592,5 +617,57 @@ internal fun tagesLabel(zeit: Instant): String {
         0L -> "Heute"
         1L -> "Gestern"
         else -> tag.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+    }
+}
+
+/**
+ * Hinweisleiste über der Liste: Verbindung weg, App weiter benutzbar.
+ *
+ * [grund] null bedeutet „wieder online, aber es wartet noch etwas auf die
+ * Übertragung“.
+ */
+@Composable
+private fun OfflineBanner(grund: String?, ausstehend: Int) {
+    val titel = if (grund == null) "Übertragung läuft" else "Offline-Modus – $grund"
+    val untertitel = when {
+        ausstehend == 0 -> "Angezeigt wird der zuletzt geladene Stand."
+        ausstehend == 1 ->
+            "Eine Änderung wartet auf die Übertragung und geht raus, sobald die Verbindung steht."
+        else ->
+            "$ausstehend Änderungen warten auf die Übertragung und gehen raus, " +
+                "sobald die Verbindung steht."
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MinzeHonig.farben.hinweisFlaeche,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                if (grund == null) Icons.Outlined.CloudUpload else Icons.Outlined.CloudOff,
+                contentDescription = null,
+                tint = MinzeHonig.farben.hinweis,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    titel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MinzeHonig.farben.hinweis,
+                )
+                Text(
+                    untertitel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MinzeHonig.farben.hinweis,
+                )
+            }
+        }
     }
 }

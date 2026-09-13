@@ -153,6 +153,10 @@ Models.kt                    Seite/FlaschenArt/Entry/TodayStats, ISO-Parser
 data/EntryService.kt         gemeinsames Interface der Datenquellen
 data/DemoService.kt          lokale SQLite (sqflite-kompatibel)
 data/ApiService.kt           REST-Client (OkHttp; PATCH + mTLS)
+data/Netzfehler.kt           Einordnung: nie gesendet vs. mehrdeutig
+data/OfflineSpeicher.kt      Warteschlange + Lesestand je Zugang (JSON)
+data/OfflineService.kt       Offline-Hülle um die Server-Quelle,
+                             Verbindungswache (ConnectivityManager)
 data/CloudflareServiceToken.kt Service-Token-Header + Erkennung der
                              Access-Abweisung (Redirect auf die Login-Seite)
 data/ClientCertificates.kt   PEM (crt/key) -> SSLSocketFactory, inkl. PKCS#1->#8
@@ -187,6 +191,59 @@ ankommt. `ApiService` und die Uhr erkennen das am Host der finalen Anfrage
 und melden es als Token-Problem. Die Uhr behandelt den Fall wie „Server
 nicht erreichbar“ und weicht auf das Telefon aus: die Anfrage wurde am Rand
 abgefangen, hat den Server also nachweislich nie erreicht.
+
+## Offline-Betrieb
+
+Bricht die Verbindung weg, bleibt die App benutzbar. `OfflineService` legt
+sich dafür über die Server-Quelle (nur in den Server-Modi, nicht im Demo).
+
+**Lesen:** Nach jedem erfolgreichen Laden liegt der Stand als JSON in
+`filesDir/offline/`, getrennt nach Einträgen und Statistik (die Oberfläche
+lädt beide nebenläufig). Scheitert das Laden an einem Netzwerkfehler, zeigt
+die App diesen Stand statt einer leeren Liste. Ob die Anfrage ankam, spielt
+beim Lesen keine Rolle.
+
+**Schreiben:** Was nicht rausging, landet in einer Warteschlange und geht
+raus, sobald die Verbindung steht. Entscheidend ist `Netzfehler`:
+
+| Fall | Exception | Verhalten |
+|---|---|---|
+| nie gesendet | `UnknownHostException`, `ConnectException`, `NoRouteToHostException`, `SSLException` | in die Warteschlange |
+| mehrdeutig | `SocketTimeoutException`, jede andere `IOException` | Fehlermeldung wie bisher |
+
+Der Unterschied verhindert Duplikate: Bei einem Abbruch mitten in der
+Übertragung könnte der Server den Eintrag längst haben, ein zweiter Versuch
+legte dann einen zweiten an. Die API kennt keinen Idempotenz-Schlüssel,
+deshalb bleibt es in diesen Fällen bei der Meldung. Alles, was keine
+`IOException` ist (etwa eine `ApiException` mit HTTP-Status), gilt nicht als
+Verbindungsproblem.
+
+**Warteschlange.** Neue Einträge bekommen eine negative lokale ID und
+erscheinen sofort in der Liste (mit Uhr-Symbol). Änderungen und Löschungen an
+einem noch wartenden Eintrag werden direkt in dessen `Anlegen`-Aktion
+eingearbeitet bzw. werfen sie ganz raus — dadurch beziehen sich alle
+`Aendern`/`Loeschen`-Aktionen immer auf echte Server-IDs, und beim Abarbeiten
+kann keine unbekannte ID auftauchen. Solange etwas ansteht, geht auch ein
+neuer Schreibzugriff hinten dran statt am Stau vorbei; sonst käme die
+Reihenfolge durcheinander. Geschrieben wird über eine Nebendatei mit
+anschliessendem Umbenennen, damit ein Absturz mitten im Schreiben nicht die
+halbe Warteschlange hinterlässt.
+
+**Abgearbeitet** wird vor jedem Laden und sobald der `ConnectivityManager`
+wieder ein Netz meldet. Beim ersten Verbindungsfehler bricht der Durchlauf
+ab, der Rest bleibt in der Reihenfolge stehen. Weist der Server eine Aktion
+inhaltlich zurück (etwa ein längst gelöschter Eintrag), fliegt sie raus und
+wird einmal gemeldet — sonst blockierte sie die Warteschlange für immer.
+
+Die Ablage hängt am Zugang (Modus + Basis-URL). Ein Serverwechsel zeigt also
+nicht die Einträge des anderen und lädt keine Warteschlange dorthin hoch, wo
+sie nicht hingehört.
+
+**Die Uhr bleibt aussen vor.** `WearRequestService` holt sich die Quelle ohne
+Offline-Hülle: die Uhr führt eine eigene Outbox und bekäme sonst ein
+„erledigt“ gemeldet, während der Eintrag noch beim Telefon liegt. Scheitert
+die Übertragung, meldet der Service das weiterhin an die Uhr, die den Eintrag
+dann selbst aufbewahrt und erneut schickt.
 
 ## Watch-Protokoll (Data-Layer-API)
 

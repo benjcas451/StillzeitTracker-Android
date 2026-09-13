@@ -95,10 +95,20 @@ data class MhFarben(
     val sektionsTitel: Color,
     /** Erfolg-Icon (Zertifikate gefunden). */
     val erfolg: Color,
+    /** Text und Icon der Hinweisleiste (Offline-Modus). */
+    val hinweis: Color,
+    /** Fläche der Hinweisleiste. */
+    val hinweisFlaeche: Color,
 )
 
 private val LocalMhFarben = staticCompositionLocalOf {
-    MhFarben(gruenText = Mh.gruen700, sektionsTitel = Mh.gruen700, erfolg = Mh.gruen600)
+    MhFarben(
+        gruenText = Mh.gruen700,
+        sektionsTitel = Mh.gruen700,
+        erfolg = Mh.gruen600,
+        hinweis = Mh.gelb900,
+        hinweisFlaeche = Mh.gelb200,
+    )
 }
 
 /** Zugriff auf die erweiterten Design-System-Farben. */
@@ -310,9 +320,23 @@ private val MhFormen = Shapes(
 fun StillzeitTheme(content: @Composable () -> Unit) {
     val dunkel = isSystemInDarkTheme()
     val erweitert = if (dunkel) {
-        MhFarben(gruenText = Mh.gruen300, sektionsTitel = Mh.gruen300, erfolg = Mh.gruen300)
+        MhFarben(
+            gruenText = Mh.gruen300,
+            sektionsTitel = Mh.gruen300,
+            erfolg = Mh.gruen300,
+            // Im Dunkeln trägt die Hinweisleiste die dunkle Honig-Fläche mit
+            // hellem Text – sonst blendete sie.
+            hinweis = Mh.gelb300,
+            hinweisFlaeche = Mh.gelb900,
+        )
     } else {
-        MhFarben(gruenText = Mh.gruen700, sektionsTitel = Mh.gruen700, erfolg = Mh.gruen600)
+        MhFarben(
+            gruenText = Mh.gruen700,
+            sektionsTitel = Mh.gruen700,
+            erfolg = Mh.gruen600,
+            hinweis = Mh.gelb900,
+            hinweisFlaeche = Mh.gelb200,
+        )
     }
     CompositionLocalProvider(LocalMhFarben provides erweitert) {
         MaterialTheme(
