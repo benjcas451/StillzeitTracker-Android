@@ -22,5 +22,12 @@ fun createConfiguredEntryService(context: Context, settings: AppSettings, certSo
             baseUrl = settings.apiKeyBaseUrl,
             apiKey = settings.apiKey,
         )
+        // Cloudflare Access sichert den Zugang am Rand; der Zusatz-Key ist wie
+        // im mTLS-Modus optional und geht nur raus, wenn er hinterlegt ist.
+        DataSourceMode.CLOUDFLARE -> ApiService(
+            baseUrl = settings.cloudflareBaseUrl,
+            apiKey = settings.cloudflareApiKey.ifEmpty { null },
+            cfToken = settings.cfServiceToken(),
+        )
         DataSourceMode.DEMO -> DemoService(context) { settings.breiWasserAktiviert }
     }

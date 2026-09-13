@@ -111,6 +111,7 @@ Gültige Werte für "seite": Links, Rechts, Beidseitig, Flasche sowie – wenn d
 Authentifizierung je nach Datenquelle:
 • Server (mTLS-API): Client-Zertifikat (client.crt + client.key), optional zusätzlich der Header "X-API-Key: <Key>"
 • Server (API-Key): HTTP-Header "X-API-Key: <Key>"
+• Server (Cloudflare Access): Header "CF-Access-Client-Id: <ID>" und "CF-Access-Client-Secret: <Secret>", optional zusätzlich "X-API-Key: <Key>"
 
 Ein Eintrag hat die Felder id, create_time, seite, menge (bei Flasche/Wasser in ml, bei Brei in g), einheit ("ml", "g" oder null), flaschen_art (Pre oder Mutter, nur bei Flasche) und dauer_minuten (optionale Stilldauer in Minuten, nur bei Links/Rechts/Beidseitig). Fehler kommen als {"error": "..."} mit passendem HTTP-Statuscode.
 """
@@ -172,6 +173,10 @@ fun SettingsScreen(
     var apiKeyUrl by remember { mutableStateOf(settings.apiKeyBaseUrl) }
     var apiKey by remember { mutableStateOf(settings.apiKey) }
     var mtlsApiKey by remember { mutableStateOf(settings.mtlsApiKey) }
+    var cloudflareUrl by remember { mutableStateOf(settings.cloudflareBaseUrl) }
+    var cloudflareApiKey by remember { mutableStateOf(settings.cloudflareApiKey) }
+    var cfClientId by remember { mutableStateOf(settings.cfAccessClientId) }
+    var cfClientSecret by remember { mutableStateOf(settings.cfAccessClientSecret) }
     var certsOk by remember { mutableStateOf(false) }
     var beschaeftigt by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -283,6 +288,11 @@ fun SettingsScreen(
                 untertitel = "API-Key empfohlen (statt Zertifikat)",
             ) { mode = DataSourceMode.API_KEY; settings.mode = mode }
             ModusZeile(
+                gewaehlt = mode == DataSourceMode.CLOUDFLARE,
+                titel = "Server (Cloudflare Access)",
+                untertitel = "Zugang per Service Token",
+            ) { mode = DataSourceMode.CLOUDFLARE; settings.mode = mode }
+            ModusZeile(
                 gewaehlt = mode == DataSourceMode.DEMO,
                 titel = "Lokal (SQLite)",
                 untertitel = "Einträge bleiben nur auf diesem Gerät",
@@ -302,6 +312,50 @@ fun SettingsScreen(
                     onAenderung = {
                         apiKey = it
                         settings.apiKey = it
+                    },
+                )
+            }
+
+            // Cloudflare Access prüft das Service Token am Rand und reicht die
+            // Anfrage erst danach an den Server weiter. Der Zusatz-Key ist wie
+            // im mTLS-Modus optional — für Server, die dahinter weiter ihren
+            // eigenen Key verlangen.
+            if (mode == DataSourceMode.CLOUDFLARE) {
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Abschnitt("Server (Cloudflare Access)")
+                UrlFeld(wert = cloudflareUrl, onAenderung = {
+                    cloudflareUrl = it
+                    settings.cloudflareBaseUrl = it
+                })
+                Spacer(Modifier.height(16.dp))
+                ApiKeyFeld(
+                    wert = cfClientId,
+                    titel = "Client-ID",
+                    hinweis = "Client-ID des Service Tokens, endet üblicherweise auf „.access“.",
+                    onAenderung = {
+                        cfClientId = it
+                        settings.cfAccessClientId = it
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                ApiKeyFeld(
+                    wert = cfClientSecret,
+                    titel = "Client-Secret",
+                    hinweis = "Beide Teile nötig. Service Tokens laufen ab, " +
+                        "standardmäßig nach einem Jahr.",
+                    onAenderung = {
+                        cfClientSecret = it
+                        settings.cfAccessClientSecret = it
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                ApiKeyFeld(
+                    wert = cloudflareApiKey,
+                    hinweis = "Nur nötig, wenn der Server hinter Cloudflare " +
+                        "zusätzlich einen Key erwartet.",
+                    onAenderung = {
+                        cloudflareApiKey = it
+                        settings.cloudflareApiKey = it
                     },
                 )
             }
@@ -546,14 +600,19 @@ private fun ModusZeile(
 
 /** Eingabefeld für einen API-Key: verdeckt, mit Auge zum Aufdecken. */
 @Composable
-private fun ApiKeyFeld(wert: String, hinweis: String, onAenderung: (String) -> Unit) {
+private fun ApiKeyFeld(
+    wert: String,
+    hinweis: String,
+    onAenderung: (String) -> Unit,
+    titel: String = "API-Key (optional)",
+) {
     var sichtbar by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = wert,
         onValueChange = onAenderung,
         shape = MaterialTheme.shapes.medium,
         colors = mhEingabefeldFarben(),
-        label = { Text("API-Key (optional)") },
+        label = { Text(titel) },
         supportingText = { Text(hinweis) },
         singleLine = true,
         visualTransformation = if (sichtbar) {

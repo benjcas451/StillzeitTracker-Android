@@ -141,6 +141,22 @@ class WearRequestService : WearableListenerService() {
                     .put("api_key", settings.apiKey)
             }
 
+            DataSourceMode.CLOUDFLARE -> {
+                val baseUrl = settings.cloudflareBaseUrl
+                pruefeBaseUrl(baseUrl)
+                val token = settings.cfServiceToken()
+                    ?: throw IllegalStateException(
+                        "Auf dem Telefon ist kein vollständiges Service Token hinterlegt.",
+                    )
+                JSONObject()
+                    .put("mode", "cloudflare")
+                    .put("base_url", baseUrl)
+                    .put("cf_access_client_id", token.clientId)
+                    .put("cf_access_client_secret", token.clientSecret)
+                    // Optionaler Zusatz-Key, analog zum mTLS-Modus.
+                    .put("api_key", settings.cloudflareApiKey)
+            }
+
             DataSourceMode.API -> {
                 val baseUrl = settings.apiBaseUrl
                 pruefeBaseUrl(baseUrl)

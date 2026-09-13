@@ -238,6 +238,13 @@ class WatchModel(context: Context) {
                         main.post { ausfuehren(Aktion.Laden) }
                     }
                 }
+            } catch (abgewiesen: AccessAbgewiesen) {
+                // Am Rand abgefangen, der Server hat die Anfrage nie gesehen —
+                // der Umweg über das Telefon ist damit genauso gefahrlos wie
+                // bei einem VerbindungsFehler.
+                main.post {
+                    ueberTelefon(aktion, abgewiesen.message)
+                }
             } catch (_: VerbindungsFehler) {
                 // Der Server war gar nicht erreichbar — nichts wurde gesendet,
                 // also ist der Umweg über das Telefon gefahrlos.

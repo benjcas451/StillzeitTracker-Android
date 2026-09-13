@@ -22,6 +22,14 @@ class VerbindungsFehler(meldung: String) : Exception(meldung)
 class AntwortFehler(meldung: String) : Exception(meldung)
 
 /**
+ * Cloudflare Access hat die Anfrage am Rand abgefangen — sie hat den
+ * eigentlichen Server also nie erreicht. Der Umweg über das Telefon ist
+ * gefahrlos und oft sogar erfolgreich, etwa wenn die Uhr noch ein
+ * abgelaufenes Token hält und das Telefon längst ein neues hat.
+ */
+class AccessAbgewiesen(meldung: String) : Exception(meldung)
+
+/**
  * Spricht die Stillzeit-REST-API direkt von der Uhr aus — mit derselben
  * Basis-URL und denselben Zugangsdaten wie die Telefon-App.
  *
@@ -113,6 +121,12 @@ class DirectApi(private val verbindung: ServerConnection) {
             connection.readTimeout = TIMEOUT_MS
             connection.setRequestProperty("Accept", "application/json")
             verbindung.apiKey?.let { connection.setRequestProperty("X-API-Key", it) }
+            val cfId = verbindung.cfAccessClientId
+            val cfSecret = verbindung.cfAccessClientSecret
+            if (cfId != null && cfSecret != null) {
+                connection.setRequestProperty("CF-Access-Client-Id", cfId)
+                connection.setRequestProperty("CF-Access-Client-Secret", cfSecret)
+            }
             if (ueberschrieben) {
                 connection.setRequestProperty("X-HTTP-Method-Override", methode)
             }
@@ -157,6 +171,7 @@ class DirectApi(private val verbindung: ServerConnection) {
                 }
             }
             val status = connection.responseCode
+            accessAbweisung(connection, status)?.let { throw AccessAbgewiesen(it) }
             val erfolgreich = status in 200..299
             val strom = if (erfolgreich) connection.inputStream else connection.errorStream
             val text = strom?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
@@ -175,6 +190,27 @@ class DirectApi(private val verbindung: ServerConnection) {
         }
     }
 
+    /**
+     * Erkennt, dass Cloudflare Access die Anfrage abgefangen hat.
+     *
+     * Ohne gültiges Token leitet Access auf die Login-Seite des Teams um.
+     * HttpURLConnection folgt dem automatisch, sodass am Ende eine HTML-Seite
+     * mit Status 200 ankommt — ohne diese Prüfung meldete die Uhr dafür nur
+     * „Unerwartete Antwort des Servers“. Erkennbar am Host der finalen
+     * Antwort: Access leitet immer auf eine Subdomain von
+     * `cloudflareaccess.com`.
+     */
+    private fun accessAbweisung(connection: HttpURLConnection, status: Int): String? {
+        val host = connection.url.host.orEmpty().lowercase()
+        if (host == LOGIN_HOST || host.endsWith(".$LOGIN_HOST")) {
+            return "Cloudflare Access hat die Uhr abgewiesen — über das Handy erledigt."
+        }
+        if (status == 403 && connection.getHeaderField("cf-ray") != null) {
+            return "Cloudflare Access hat den Zugriff verweigert — über das Handy erledigt."
+        }
+        return null
+    }
+
     /** Zieht `{"error": "..."}` heraus bzw. kürzt eine HTML-Fehlerseite. */
     private fun fehlertext(text: String): String {
         val ausJson = runCatching { JSONObject(text).optString("error") }.getOrNull()
@@ -190,5 +226,6 @@ class DirectApi(private val verbindung: ServerConnection) {
     private companion object {
         const val TIMEOUT_MS = 15_000
         const val MAX_EINTRAEGE = 12
+        const val LOGIN_HOST = "cloudflareaccess.com"
     }
 }
