@@ -2,7 +2,6 @@ package org.dwarftsch.stillzeit.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -12,33 +11,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -46,10 +27,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,18 +39,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.dwarftsch.stillzeit.R
 import org.dwarftsch.stillzeit.data.AppSettings
 import org.dwarftsch.stillzeit.data.CertSource
 import org.dwarftsch.stillzeit.data.DataSourceMode
-import org.dwarftsch.stillzeit.data.meldung
 import org.dwarftsch.stillzeit.data.DemoService
 import org.dwarftsch.stillzeit.data.LocalBackupService
+import org.dwarftsch.stillzeit.data.meldung
 
 /** Beschreibung der REST-API (für den Dialog "Aufbau API"). */
 private const val API_INFO_TEXT = """
@@ -158,7 +140,7 @@ Den Zertifikats-Ordner für mTLS muss man in beiden Fällen neu auswählen: die 
 Davon unabhängig bleibt das manuelle JSON-Backup weiter unten – es nimmt die Einträge mit, egal wohin. Beim Wiederherstellen sind Dateien bis 16 MB zulässig; alles darüber lehnt die App ab, statt beim Einlesen den Arbeitsspeicher zu sprengen.
 """
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -201,7 +183,7 @@ fun SettingsScreen(
                 .onFailure { zeige("Fehler bei der Ordnerauswahl: ${it.meldung()}") }
             scope.launch {
                 certsOk = pruefeZertifikate()
-                zeige(if (certsOk) "Zertifikate gefunden." else "Keine Zertifikate gefunden.")
+                zeige(if (certsOk) "Zertifikate gefunden" else "Keine Zertifikate gefunden")
             }
         }
     }
@@ -221,7 +203,7 @@ fun SettingsScreen(
                         } ?: error("Datei ließ sich nicht schreiben.")
                     }
                 }.fold(
-                    onSuccess = { zeige("Backup gespeichert.") },
+                    onSuccess = { zeige("Backup gespeichert") },
                     onFailure = { zeige("Backup fehlgeschlagen: ${it.meldung()}") },
                 )
                 beschaeftigt = false
@@ -246,7 +228,7 @@ fun SettingsScreen(
                     DemoService(context).replaceAll(rows)
                     rows.size
                 }.fold(
-                    onSuccess = { zeige("Wiederherstellung erfolgreich: $it Einträge.") },
+                    onSuccess = { zeige("$it Einträge wiederhergestellt") },
                     onFailure = { zeige("Wiederherstellung fehlgeschlagen: ${it.meldung()}") },
                 )
                 beschaeftigt = false
@@ -255,44 +237,38 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Einstellungen") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onZurueck) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
-                    }
-                },
-            )
-        },
+        topBar = { MhKopf(titel = "Einstellungen", onZurueck = onZurueck) },
         snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = Mh.farben.bg,
     ) { innenAbstand ->
+        val f = Mh.farben
         Column(
             modifier = Modifier
                 .padding(innenAbstand)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Mh.rand)
+                .padding(bottom = Mh.abstand8),
         ) {
-            Abschnitt("Datenquelle")
-
+            MhGruppenLabel("Datenquelle")
             ModusZeile(
                 gewaehlt = mode == DataSourceMode.API,
                 titel = "Server (mTLS-API)",
                 untertitel = "Synchronisation per Client-Zertifikat",
             ) { mode = DataSourceMode.API; settings.mode = mode }
+            MhTrennlinie()
             ModusZeile(
                 gewaehlt = mode == DataSourceMode.API_KEY,
                 titel = "Server (API-Key)",
                 untertitel = "API-Key empfohlen (statt Zertifikat)",
             ) { mode = DataSourceMode.API_KEY; settings.mode = mode }
+            MhTrennlinie()
             ModusZeile(
                 gewaehlt = mode == DataSourceMode.CLOUDFLARE,
                 titel = "Server (Cloudflare Access)",
                 untertitel = "Zugang per Service Token",
             ) { mode = DataSourceMode.CLOUDFLARE; settings.mode = mode }
+            MhTrennlinie()
             ModusZeile(
                 gewaehlt = mode == DataSourceMode.DEMO,
                 titel = "Lokal (SQLite)",
@@ -300,21 +276,21 @@ fun SettingsScreen(
             ) { mode = DataSourceMode.DEMO; settings.mode = mode }
 
             if (mode == DataSourceMode.API_KEY) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Abschnitt("Server (API-Key)")
-                UrlFeld(wert = apiKeyUrl, onAenderung = {
-                    apiKeyUrl = it
-                    settings.apiKeyBaseUrl = it
-                })
-                Spacer(Modifier.height(16.dp))
-                ApiKeyFeld(
-                    wert = apiKey,
-                    hinweis = "Empfohlen. Ohne API-Key nur für interne Testzwecke.",
-                    onAenderung = {
-                        apiKey = it
-                        settings.apiKey = it
-                    },
-                )
+                MhGruppenLabel("Server (API-Key)")
+                Column(verticalArrangement = Arrangement.spacedBy(Mh.abstand4)) {
+                    UrlFeld(wert = apiKeyUrl, onAenderung = {
+                        apiKeyUrl = it
+                        settings.apiKeyBaseUrl = it
+                    })
+                    ApiKeyFeld(
+                        wert = apiKey,
+                        hinweis = "Empfohlen. Ohne API-Key nur für interne Testzwecke.",
+                        onAenderung = {
+                            apiKey = it
+                            settings.apiKey = it
+                        },
+                    )
+                }
             }
 
             // Cloudflare Access prüft das Service Token am Rand und reicht die
@@ -322,130 +298,152 @@ fun SettingsScreen(
             // im mTLS-Modus optional — für Server, die dahinter weiter ihren
             // eigenen Key verlangen.
             if (mode == DataSourceMode.CLOUDFLARE) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Abschnitt("Server (Cloudflare Access)")
-                UrlFeld(wert = cloudflareUrl, onAenderung = {
-                    cloudflareUrl = it
-                    settings.cloudflareBaseUrl = it
-                })
-                Spacer(Modifier.height(16.dp))
-                ApiKeyFeld(
-                    wert = cfClientId,
-                    titel = "Client-ID",
-                    hinweis = "Client-ID des Service Tokens, endet üblicherweise auf „.access“.",
-                    onAenderung = {
-                        cfClientId = it
-                        settings.cfAccessClientId = it
-                    },
-                )
-                Spacer(Modifier.height(16.dp))
-                ApiKeyFeld(
-                    wert = cfClientSecret,
-                    titel = "Client-Secret",
-                    hinweis = "Beide Teile nötig. Service Tokens laufen ab, " +
-                        "standardmäßig nach einem Jahr.",
-                    onAenderung = {
-                        cfClientSecret = it
-                        settings.cfAccessClientSecret = it
-                    },
-                )
-                Spacer(Modifier.height(16.dp))
-                ApiKeyFeld(
-                    wert = cloudflareApiKey,
-                    hinweis = "Nur nötig, wenn der Server hinter Cloudflare " +
-                        "zusätzlich einen Key erwartet.",
-                    onAenderung = {
-                        cloudflareApiKey = it
-                        settings.cloudflareApiKey = it
-                    },
-                )
+                MhGruppenLabel("Server (Cloudflare Access)")
+                Column(verticalArrangement = Arrangement.spacedBy(Mh.abstand4)) {
+                    UrlFeld(wert = cloudflareUrl, onAenderung = {
+                        cloudflareUrl = it
+                        settings.cloudflareBaseUrl = it
+                    })
+                    ApiKeyFeld(
+                        wert = cfClientId,
+                        titel = "Client-ID",
+                        hinweis = "Client-ID des Service Tokens, endet üblicherweise auf „.access“.",
+                        onAenderung = {
+                            cfClientId = it
+                            settings.cfAccessClientId = it
+                        },
+                    )
+                    ApiKeyFeld(
+                        wert = cfClientSecret,
+                        titel = "Client-Secret",
+                        hinweis = "Beide Teile nötig. Service Tokens laufen ab, " +
+                            "standardmäßig nach einem Jahr.",
+                        onAenderung = {
+                            cfClientSecret = it
+                            settings.cfAccessClientSecret = it
+                        },
+                    )
+                    ApiKeyFeld(
+                        wert = cloudflareApiKey,
+                        hinweis = "Nur nötig, wenn der Server hinter Cloudflare " +
+                            "zusätzlich einen Key erwartet.",
+                        onAenderung = {
+                            cloudflareApiKey = it
+                            settings.cloudflareApiKey = it
+                        },
+                    )
+                }
             }
 
             if (mode == DataSourceMode.API) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Abschnitt("Server (mTLS-API)")
-                UrlFeld(wert = apiUrl, onAenderung = {
-                    apiUrl = it
-                    settings.apiBaseUrl = it
-                })
-                Spacer(Modifier.height(16.dp))
-                // Zusätzlich zum Client-Zertifikat: Server, die beides prüfen,
-                // brauchen den Key im X-API-Key-Header. Leer lassen = nur mTLS.
-                ApiKeyFeld(
-                    wert = mtlsApiKey,
-                    hinweis = "Nur nötig, wenn der Server zusätzlich zum " +
-                        "Zertifikat einen Key erwartet. Leer lassen für reines mTLS.",
-                    onAenderung = {
-                        mtlsApiKey = it
-                        settings.mtlsApiKey = it
-                    },
-                )
-                Spacer(Modifier.height(8.dp))
+                MhGruppenLabel("Server (mTLS-API)")
+                Column(verticalArrangement = Arrangement.spacedBy(Mh.abstand4)) {
+                    UrlFeld(wert = apiUrl, onAenderung = {
+                        apiUrl = it
+                        settings.apiBaseUrl = it
+                    })
+                    // Zusätzlich zum Client-Zertifikat: Server, die beides prüfen,
+                    // brauchen den Key im X-API-Key-Header. Leer lassen = nur mTLS.
+                    ApiKeyFeld(
+                        wert = mtlsApiKey,
+                        hinweis = "Nur nötig, wenn der Server zusätzlich zum " +
+                            "Zertifikat einen Key erwartet. Leer lassen für reines mTLS.",
+                        onAenderung = {
+                            mtlsApiKey = it
+                            settings.mtlsApiKey = it
+                        },
+                    )
+                }
+                Spacer(Modifier.height(Mh.abstand4))
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Mh.abstand2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        if (certsOk) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
-                        contentDescription = null,
-                        tint = if (certsOk) MinzeHonig.farben.erfolg else MaterialTheme.colorScheme.error,
+                    MhSymbol(
+                        if (certsOk) R.drawable.ic_mh_check else R.drawable.ic_mh_alert,
+                        null,
+                        farbe = if (certsOk) f.successFg else f.danger,
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Mh.abstand3))
                     Column {
-                        Text(if (certsOk) "Zertifikate gefunden" else "Keine Zertifikate gefunden")
+                        Text(
+                            if (certsOk) "Zertifikate gefunden" else "Keine Zertifikate gefunden",
+                            style = MhTypo.body,
+                            color = f.textStrong,
+                        )
                         Text(
                             certSource.locationLabel ?: "Kein Ordner ausgewählt",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MhTypo.small,
+                            color = f.textSecondary,
                         )
                     }
                 }
                 FlowRow(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Mh.abstand2),
+                    verticalArrangement = Arrangement.spacedBy(Mh.abstand2),
                 ) {
-                    Button(onClick = { ordnerWahl.launch(null) }, shape = MaterialTheme.shapes.medium) {
-                        Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Zertifikats-Ordner wählen")
-                    }
-                    OutlinedButton(shape = MaterialTheme.shapes.medium, colors = ButtonDefaults.outlinedButtonColors(contentColor = MinzeHonig.farben.gruenText), onClick = {
-                        scope.launch {
-                            certsOk = pruefeZertifikate()
-                            zeige(if (certsOk) "Zertifikate gefunden." else "Keine Zertifikate gefunden.")
-                        }
-                    }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Erneut prüfen")
-                    }
+                    MhZweitButton(
+                        "Zertifikats-Ordner wählen",
+                        { ordnerWahl.launch(null) },
+                        symbol = R.drawable.ic_mh_folder,
+                    )
+                    MhTextButton(
+                        "Erneut prüfen",
+                        {
+                            scope.launch {
+                                certsOk = pruefeZertifikate()
+                                zeige(if (certsOk) "Zertifikate gefunden" else "Keine Zertifikate gefunden")
+                            }
+                        },
+                        symbol = R.drawable.ic_mh_refresh,
+                    )
                 }
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Abschnitt("Brei & Wasser")
+            MhGruppenLabel("Brei & Wasser")
             // Lokales Opt-in (Default aus): allein dieser Schalter blendet die
             // beiden Erfassungs-Buttons ein – in jedem Modus. Der Stand der
             // Server-Option ist nur noch ein Hinweis (siehe unten).
             var breiWasserAktiviert by remember { mutableStateOf(settings.breiWasserAktiviert) }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .toggleable(
+                        value = breiWasserAktiviert,
+                        role = Role.Switch,
+                        onValueChange = {
+                            breiWasserAktiviert = it
+                            settings.breiWasserAktiviert = it
+                        },
+                    )
+                    .padding(vertical = Mh.abstand2),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Brei & Wasser erfassen")
                     Text(
-                        "Zusätzliche Buttons für Brei (g) und Wasser (ml).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "Brei & Wasser erfassen",
+                        style = MhTypo.body.copy(fontWeight = FontWeight.Medium),
+                        color = f.textStrong,
+                    )
+                    Text(
+                        "Zusätzliche Auswahl für Brei (g) und Wasser (ml).",
+                        style = MhTypo.small,
+                        color = f.textSecondary,
                     )
                 }
+                Spacer(Modifier.width(Mh.abstand3))
                 Switch(
                     checked = breiWasserAktiviert,
-                    onCheckedChange = {
-                        breiWasserAktiviert = it
-                        settings.breiWasserAktiviert = it
-                    },
+                    onCheckedChange = null,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = f.onPrimary,
+                        checkedTrackColor = f.primary,
+                        checkedBorderColor = f.primary,
+                        uncheckedThumbColor = f.textTertiary,
+                        uncheckedTrackColor = f.surfaceSubtle,
+                        uncheckedBorderColor = f.borderStrong,
+                    ),
                 )
             }
             // Der Server kann die Eintragsarten pro Familie abschalten und
@@ -453,72 +451,54 @@ fun SettingsScreen(
             // meldet ein Server das Flag gar nicht erst, bliebe der Schalter
             // sonst wirkungslos (Fehlerbild bis 2.2.0).
             if (breiWasserAktiviert && !settings.serverOptionZuletztAktiv()) {
-                Text(
+                MhHinweis(
                     "Dieser Server hat die Option für deine Familie zuletzt nicht " +
                         "gemeldet. Legst du trotzdem Brei oder Wasser an, kann er " +
                         "den Eintrag ablehnen.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                    art = MhHinweisArt.Warnung,
+                    modifier = Modifier.padding(top = Mh.abstand2),
                 )
             }
 
             if (mode == DataSourceMode.DEMO) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Abschnitt("Backup")
-                Button(
-                    onClick = { backupSpeichern.launch(LocalBackupService.dateiname()) },
-                    enabled = !beschaeftigt,
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = MaterialTheme.colorScheme.onSecondary,
-                    ),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                ) {
-                    Icon(Icons.Filled.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (beschaeftigt) "Bitte warten …" else "Zu Google Drive speichern")
+                MhGruppenLabel("Backup")
+                Column(verticalArrangement = Arrangement.spacedBy(Mh.abstand2)) {
+                    MhZweitButton(
+                        if (beschaeftigt) "Bitte warten …" else "Zu Google Drive speichern",
+                        { backupSpeichern.launch(LocalBackupService.dateiname()) },
+                        symbol = R.drawable.ic_mh_upload,
+                        enabled = !beschaeftigt,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    MhZweitButton(
+                        "Backup wiederherstellen",
+                        { restoreBestaetigen = true },
+                        symbol = R.drawable.ic_mh_download,
+                        enabled = !beschaeftigt,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Im Dateidialog Google Drive als Ziel wählen.",
+                        style = MhTypo.small,
+                        color = f.textSecondary,
+                    )
                 }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { restoreBestaetigen = true },
-                    enabled = !beschaeftigt,
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MinzeHonig.farben.gruenText),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                ) {
-                    Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Backup wiederherstellen")
-                }
-                Text(
-                    "Im Dateidialog Google Drive als Ziel wählen.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
-                )
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Abschnitt("Erklärung")
-            FlowRow(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(shape = MaterialTheme.shapes.medium, colors = ButtonDefaults.outlinedButtonColors(contentColor = MinzeHonig.farben.gruenText), onClick = { infoDialog = "Aufbau API" to API_INFO_TEXT.trim() }) {
-                    Icon(Icons.Outlined.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Aufbau API")
-                }
-                OutlinedButton(shape = MaterialTheme.shapes.medium, colors = ButtonDefaults.outlinedButtonColors(contentColor = MinzeHonig.farben.gruenText), onClick = { infoDialog = "Aufbau Datenbank" to DB_INFO_TEXT.trim() }) {
-                    Icon(Icons.Filled.Storage, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Aufbau Datenbank")
-                }
-            }
-            Spacer(Modifier.height(24.dp))
+            MhGruppenLabel("Erklärung")
+            MhListenZeile(
+                "Aufbau API",
+                symbol = R.drawable.ic_mh_cloud,
+                pfeil = true,
+                onClick = { infoDialog = "Aufbau API" to API_INFO_TEXT.trim() },
+            )
+            MhTrennlinie()
+            MhListenZeile(
+                "Aufbau Datenbank",
+                symbol = R.drawable.ic_mh_info,
+                pfeil = true,
+                onClick = { infoDialog = "Aufbau Datenbank" to DB_INFO_TEXT.trim() },
+            )
         }
     }
 
@@ -528,46 +508,29 @@ fun SettingsScreen(
 
     if (restoreBestaetigen) {
         AlertDialog(
-            shape = MaterialTheme.shapes.extraLarge,
             onDismissRequest = { restoreBestaetigen = false },
-            title = { Text("Backup wiederherstellen?") },
+            title = { Text("Backup wiederherstellen", style = MhTypo.h2) },
             text = {
                 Text(
                     "Alle aktuell lokal gespeicherten Einträge werden durch den Inhalt " +
                         "des Backups ersetzt. Dieser Vorgang kann nicht rückgängig gemacht werden.",
+                    style = MhTypo.body,
                 )
             },
             confirmButton = {
-                Button(
-                    shape = MaterialTheme.shapes.medium,
-                    onClick = {
-                        restoreBestaetigen = false
-                        backupOeffnen.launch(arrayOf("application/json"))
-                    },
-                ) {
-                    Text("Backup auswählen")
-                }
+                MhTextButton("Backup auswählen", {
+                    restoreBestaetigen = false
+                    backupOeffnen.launch(arrayOf("application/json"))
+                })
             },
             dismissButton = {
-                TextButton(
-                    onClick = { restoreBestaetigen = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-                ) { Text("Abbrechen") }
+                MhTextButton("Abbrechen", { restoreBestaetigen = false }, farbe = Mh.farben.textSecondary)
             },
         )
     }
 }
 
-@Composable
-private fun Abschnitt(titel: String) {
-    Text(
-        titel,
-        style = MaterialTheme.typography.titleSmall,
-        color = MinzeHonig.farben.sektionsTitel,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
-}
-
+/** Auswahlzeile mit Optionsfeld: Titel, Nebentext, ganze Zeile tippbar. */
 @Composable
 private fun ModusZeile(
     gewaehlt: Boolean,
@@ -578,23 +541,23 @@ private fun ModusZeile(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onWahl)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .heightIn(min = 56.dp)
+            .selectable(selected = gewaehlt, role = Role.RadioButton, onClick = onWahl)
+            .padding(vertical = Mh.abstand2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(
             selected = gewaehlt,
-            onClick = onWahl,
-            colors = RadioButtonDefaults.colors(selectedColor = MinzeHonig.farben.gruenText),
+            onClick = null,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = Mh.farben.primary,
+                unselectedColor = Mh.farben.borderStrong,
+            ),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Mh.abstand3))
         Column {
-            Text(titel)
-            Text(
-                untertitel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(titel, style = MhTypo.body.copy(fontWeight = FontWeight.Medium), color = Mh.farben.textStrong)
+            Text(untertitel, style = MhTypo.small, color = Mh.farben.textSecondary)
         }
     }
 }
@@ -608,44 +571,45 @@ private fun ApiKeyFeld(
     titel: String = "API-Key (optional)",
 ) {
     var sichtbar by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = wert,
-        onValueChange = onAenderung,
-        shape = MaterialTheme.shapes.medium,
-        colors = mhEingabefeldFarben(),
-        label = { Text(titel) },
-        supportingText = { Text(hinweis) },
-        singleLine = true,
-        visualTransformation = if (sichtbar) {
-            VisualTransformation.None
-        } else {
-            PasswordVisualTransformation()
-        },
-        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-        trailingIcon = {
-            IconButton(onClick = { sichtbar = !sichtbar }) {
-                Icon(
-                    if (sichtbar) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    contentDescription = if (sichtbar) "Verbergen" else "Anzeigen",
+    MhFeld(titel, hinweis = hinweis) {
+        OutlinedTextField(
+            value = wert,
+            onValueChange = onAenderung,
+            singleLine = true,
+            textStyle = MhTypo.body,
+            colors = mhFeldFarben(),
+            shape = MhFeldForm,
+            visualTransformation = if (sichtbar) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+            trailingIcon = {
+                MhSymbolButton(
+                    if (sichtbar) R.drawable.ic_mh_eye_off else R.drawable.ic_mh_eye,
+                    if (sichtbar) "Verbergen" else "Anzeigen",
+                    { sichtbar = !sichtbar },
                 )
-            }
-        },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-    )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /** Eingabefeld für eine API-Basis-URL. */
 @Composable
 private fun UrlFeld(wert: String, onAenderung: (String) -> Unit) {
-    OutlinedTextField(
-        value = wert,
-        onValueChange = onAenderung,
-        shape = MaterialTheme.shapes.medium,
-        colors = mhEingabefeldFarben(),
-        label = { Text("API-URL") },
-        supportingText = { Text("Basis-URL der API inkl. abschließendem /") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-    )
+    MhFeld("API-URL", hinweis = "Basis-URL der API inkl. abschließendem /") {
+        OutlinedTextField(
+            value = wert,
+            onValueChange = onAenderung,
+            singleLine = true,
+            textStyle = MhTypo.body,
+            colors = mhFeldFarben(),
+            shape = MhFeldForm,
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }

@@ -164,7 +164,7 @@ data/CertSource.kt           SAF-Ordner mit client.crt/client.key
 data/AppSettings.kt          Prefs + Flutter-Migration
 data/LocalBackupService.kt   JSON-Backup, Format kompatibel zu iOS/Flutter (Import max. 16 MB)
 wear/WearRequestService.kt   Data-Layer-RPC-Endpunkt für die Uhr
-ui/…                         Compose-UI (Theme, Home, Settings, Dialoge)
+ui/…                         Compose-UI (MhTheme, MhBausteine, Home, Settings, Dialoge)
 ```
 
 **Datenquellen (vom Nutzer wählbar):** Server per mTLS-Client-Zertifikat,
@@ -304,34 +304,42 @@ ablehnen könnte — verstecken die Buttons aber nicht mehr. Bis 2.2.0 waren
 beide Bedingungen UND-verknüpft; Server, die das Flag gar nicht liefern,
 machten den Schalter damit wirkungslos.
 
-## Design-System „Minze & Honig“ (v1.0)
+## Design-System „Minze & Honig“ (2.0)
 
-Quelle der Wahrheit im Code: `app/…/ui/Theme.kt` (Telefon) und die
-Farbsektion in `wear/…/StillzeitWearApp.kt` (Uhr). Kernregeln:
+Maßgeblich ist der Guide im Repo `DesignGuide` (`DESIGN_GUIDE.md`,
+`tokens/design-tokens.json`); die Web-Fassung des Stillzeit-Trackers ist die
+Referenz für Aufbau und Wirkung. Im Code:
 
-- **Grundregel:** Weiß dominiert (~80 %), Farbe liegt *auf* dem Grund —
-  nie als Seitenhintergrund. Dark: Grund `#1F2221`, Karten `#292D2B`,
-  Ränder `#3A403C` — kein reines Schwarz.
-- **Skalen 50–900** je Markenfarbe. 300 = Markenton (Flächen/Buttons),
-  100 = zarte Hinweisfläche, 600/700 = text-/icontauglich auf Weiß,
-  900 = Text auf 300er-Flächen. **Pastell (300) nie als Text auf Weiß.**
-- **Markenfarben:** Minze (Primär) `#A8D5BA`/300, Honig (Sekundär)
-  `#F7E8A4`/300, Flieder (Akzent, sparsam) `#CDB4DB`/300; Grau leicht
-  grünstichig (`#F6F8F6` … `#1F2221`); Rot nur semantisch
-  (Fehler/Löschen: Fläche 100 `#FAE3E1`, Text 700 `#96362F`, dark 300 `#F0B6B1`).
-- **Eintragsarten (Chip-Muster, plattformübergreifend identisch):**
-  Links = Minze, Rechts = Flieder, Flasche = Honig, Beidseitig = Grau,
-  Brei = Honig eine Stufe dunkler (400), Wasser = neutrales Grau.
-  Kacheln/Buttons: Fläche 300 + Text 900; Listen-Avatare: zarte Fläche
-  (100 bzw. Dark-Äquivalent `#263B2F`/`#3B3524`/`#352B3C`) + Icon 700/300.
-- **Dark Mode:** Pastellflächen (300) bleiben unverändert mit 900er-Text;
-  100er-Flächen werden zu den abgedunkelten Äquivalenten.
-- **Typografie:** ausschließlich **Nunito** (eingebettet, OFL — Lizenz in
-  `app/src/main/assets/OFL_NUNITO.txt`); Persönlichkeit über das Gewicht
-  (400/600/700/800), keine Schriftmischung.
-- **Form:** Radius 8 (klein) / 12 (Buttons, Inputs) / 16 (Karten) /
-  24 (Dialoge) / Pill (Chips). Buttons min. 44 dp Höhe.
-- Kontraste sind WCAG-AA-geprüft; Farbe nie als einziger Informationsträger.
+- **Telefon:** `app/…/ui/MhTheme.kt` (Rollen hell/dunkel `MhHell`/`MhDunkel`,
+  Material-Farbschema, Typo `MhTypo`, Maße `Mh.*`, `MhTheme {}`) und
+  `app/…/ui/MhBausteine.kt` (Kopf, Buttons, Segmentschalter, Auswahl,
+  Listen, Statistik, Hinweise, Felder). Bildschirme benutzen nur Rollen
+  (`Mh.farben.*`), nie Skalenwerte.
+- **Uhr:** `wear/…/wear/ui/MhTheme.kt` (Dunkel-Rollen, Wear-Farben und
+  -Typo). Auf der Uhr sind nur Farben und Schrift umgestellt, der Aufbau ist
+  unverändert; der schwarze Fenstergrund bleibt (Wear-Konvention).
+
+Kernregeln:
+
+- **Farbe ist Signal, keine Fläche.** Grund weiß bzw. `#1F2221`, Flächen im
+  Dunkeln `#262A28`, Haarlinien `#E7EBE8` bzw. `#343A36`. Keine
+  Pastell-Buttons, -Kacheln oder getönten Karten.
+- **Eine Hauptaktion je Ansicht** („Eintrag anlegen“): Minze-700 mit weißer
+  Schrift, im Dunkeln Minze-400 mit dunkler Schrift. Alles andere ist
+  Haarlinie (Zweitbutton) oder Text.
+- **Eintragsarten als Datenfarbe mit Text daneben** (Punkt 10 dp bzw.
+  Symbol auf der Uhr): Stillen (Links/Rechts/Beidseitig) = `data1` Minze,
+  Flasche = `data2` Honig, Brei/Wasser = `data3` Flieder.
+- **Typografie:** ausschließlich **Figtree** in 400/500/600, keine Kursive
+  (eingebettet, OFL — Lizenz in `app/src/main/assets/OFL_FIGTREE.txt` und
+  `licenses/Figtree-OFL.txt`). Große Zahlen dünn (400) in Textfarbe, Einheit
+  klein in Nebentextfarbe.
+- **Symbole:** eigene Liniensymbole `res/drawable/ic_mh_*.xml` (1,5 px
+  Strich, Farbe aus dem Kontext) statt Emojis und Material-Icons.
+- **Form:** Radius 6 (Auswahl) / 10 (Buttons, Felder) / 14 (Karten) /
+  20 (Dialoge). Touch-Ziele mindestens 48 dp.
+- Hell/Dunkel folgt dem System. Kontraste nach Guide Abschnitt 10 (WCAG AA);
+  Farbe nie als einziger Informationsträger.
 
 ## Sicherheit / was nie ins Repo darf
 

@@ -26,8 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,7 +35,6 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CircularProgressIndicator
-import androidx.wear.compose.material.Colors
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
@@ -46,100 +43,29 @@ import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
-import androidx.wear.compose.material.Typography
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
 import androidx.wear.compose.material.rememberPickerState
+import org.dwarftsch.stillzeit.wear.ui.MhDunkel
+import org.dwarftsch.stillzeit.wear.ui.MhWearFarben
+import org.dwarftsch.stillzeit.wear.ui.MhWearTypo
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-// --- Design-System „Minze & Honig" (v1.0, Dark-Regeln aus Guide 2.8) ---------
-// Pastelltöne (300) dienen auf dunklem Grund direkt als Akzent; Buttons
-// tragen Füllung 300 mit 900er-Text. Zarte Flächen sind die abgedunkelten
-// 100er-Äquivalente. Zuordnung wie auf dem Telefon: Links=Minze,
-// Rechts=Flieder, Beidseitig=Grau, Flasche=Honig.
+// --- Minze & Honig 2.0 (Dunkel-Rollen, siehe ui/MhTheme.kt) -----------------
+// Nur Farben und Schrift sind umgestellt, der Aufbau ist unverändert.
+// Farbe ist Signal, keine Fläche: Kacheln und Karten sind neutral (surface),
+// die Art zeigt das farbige Symbol – wie im Web Stillen Minze (data1),
+// Flasche Honig (data2), Brei und Wasser Flieder (data3). Eine gewählte
+// Option trägt selectedBg/onSelected.
 
-private val Minze300 = Color(0xFFA8D5BA)
-private val Minze900 = Color(0xFF22392C)
-private val MinzeDunkel = Color(0xFF263B2F)
-private val Honig300 = Color(0xFFF7E8A4)
-private val Honig400 = Color(0xFFEDD374)
-private val Honig900 = Color(0xFF473A17)
-private val HonigDunkel = Color(0xFF3B3524)
-private val Flieder300 = Color(0xFFCDB4DB)
-private val Flieder900 = Color(0xFF37263F)
-private val FliederDunkel = Color(0xFF352B3C)
-private val Grau300 = Color(0xFFC6CDC9)
-private val GrauRand = Color(0xFF3A403C)
-private val GrauFlaeche = Color(0xFF2E332F)
-private val Rot300 = Color(0xFFF0B6B1)
-private val Grund = Color(0xFF1F2221)
-private val Karte = Color(0xFF292D2B)
-private val TextHell = Color(0xFFECEFED)
-private val TextSekundaer = Color(0xFFA9B0AB)
+private val F = MhDunkel
 
-private val StillzeitFarben = Colors(
-    primary = Minze300,
-    primaryVariant = Color(0xFF82BD9B),
-    secondary = Honig300,
-    secondaryVariant = Color(0xFFEDD374),
-    background = Grund,
-    surface = Karte,
-    error = Rot300,
-    onPrimary = Minze900,
-    onSecondary = Honig900,
-    onBackground = TextHell,
-    onSurface = TextHell,
-    onSurfaceVariant = TextSekundaer,
-    onError = Color(0xFF4A211E),
-)
-
-/** Nunito – Persönlichkeit über das Gewicht (Guide Abschnitt 3). */
-private val Nunito = FontFamily(
-    Font(R.font.nunito_regular, FontWeight.Normal),
-    Font(R.font.nunito_semibold, FontWeight.SemiBold),
-    Font(R.font.nunito_bold, FontWeight.Bold),
-    Font(R.font.nunito_extrabold, FontWeight.ExtraBold),
-)
-
-private val StillzeitTypografie = Typography(defaultFontFamily = Nunito)
-
-/** Kräftige Fläche (300) für die Schnell-Eingabe-Kacheln. */
-private fun kachelFlaeche(seite: String): Color = when (seite) {
-    Seite.LINKS -> Minze300
-    Seite.RECHTS -> Flieder300
-    Seite.BEIDSEITIG -> GrauRand
-    Seite.BREI -> Honig400
-    Seite.WASSER -> GrauRand
-    else -> Honig300
-}
-
-/** Text/Icon auf der 300er-Fläche (900). */
-private fun kachelInhalt(seite: String): Color = when (seite) {
-    Seite.LINKS -> Minze900
-    Seite.RECHTS -> Flieder900
-    Seite.BEIDSEITIG -> TextHell
-    Seite.WASSER -> TextHell
-    else -> Honig900
-}
-
-/** Zarte, abgedunkelte Fläche für Karten-Akzente. */
-private fun zarteFlaeche(seite: String): Color = when (seite) {
-    Seite.LINKS -> MinzeDunkel
-    Seite.RECHTS -> FliederDunkel
-    Seite.BEIDSEITIG -> GrauFlaeche
-    Seite.WASSER -> GrauFlaeche
-    else -> HonigDunkel
-}
-
-/** Icon-/Akzentfarbe auf dunklem Grund (300er-Stufe). */
+/** Symbolfarbe je Art (Datenfarben, im Dunkeln die 300er-Stufe). */
 private fun akzent(seite: String): Color = when (seite) {
-    Seite.LINKS -> Minze300
-    Seite.RECHTS -> Flieder300
-    Seite.BEIDSEITIG -> Grau300
-    Seite.BREI -> Honig400
-    Seite.WASSER -> Grau300
-    else -> Honig300
+    Seite.LINKS, Seite.RECHTS, Seite.BEIDSEITIG -> F.data1
+    Seite.FLASCHE -> F.data2
+    else -> F.data3
 }
 
 private fun iconFuer(seite: String): Int = when (seite) {
@@ -169,7 +95,7 @@ fun StillzeitWearApp(model: WatchModel) {
     var ansicht by remember { mutableStateOf<Ansicht>(Ansicht.Liste) }
     var gewaehlteZeit by remember { mutableStateOf<LocalTime?>(null) }
 
-    MaterialTheme(colors = StillzeitFarben, typography = StillzeitTypografie) {
+    MaterialTheme(colors = MhWearFarben, typography = MhWearTypo) {
         // Auf der Uhr löst die Wischgeste nach rechts den Zurück-Befehl aus.
         BackHandler(enabled = ansicht != Ansicht.Liste) { ansicht = Ansicht.Liste }
 
@@ -409,7 +335,7 @@ private fun ListenAnsicht(
 
 @Composable
 private fun LetzterEintragKarte(eintrag: WatchEntry?) {
-    val flaeche = if (eintrag == null) GrauFlaeche else zarteFlaeche(eintrag.seite)
+    val flaeche = F.surface
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -479,8 +405,8 @@ private fun RowScope.AuswahlKachel(
     aktiv: Boolean,
     onClick: () -> Unit,
 ) {
-    val flaeche = if (aktiv) Minze300 else Karte
-    val inhalt = if (aktiv) Minze900 else TextSekundaer
+    val flaeche = if (aktiv) F.selectedBg else F.surface
+    val inhalt = if (aktiv) F.onSelected else F.textSecondary
     Row(
         modifier = Modifier
             .weight(1f)
@@ -538,7 +464,7 @@ private fun RowScope.AktionsKachel(seite: String, onClick: (String) -> Unit) {
             .weight(1f)
             .heightIn(min = 50.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(kachelFlaeche(seite))
+            .background(F.surface)
             .clickable { onClick(seite) }
             .padding(vertical = 5.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -547,14 +473,14 @@ private fun RowScope.AktionsKachel(seite: String, onClick: (String) -> Unit) {
         Icon(
             painter = painterResource(iconFuer(seite)),
             contentDescription = null,
-            tint = kachelInhalt(seite),
+            tint = akzent(seite),
             modifier = Modifier.size(20.dp),
         )
         Text(
             text = seite,
             style = MaterialTheme.typography.caption2,
-            color = kachelInhalt(seite),
-            fontWeight = FontWeight.Bold,
+            color = F.text,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             textAlign = TextAlign.Center,
         )
@@ -662,7 +588,7 @@ private fun VerbindungsAnsicht(model: WatchModel, onFertig: () -> Unit) {
                 Text(
                     text = model.statusText,
                     style = MaterialTheme.typography.body2,
-                    color = if (verbunden) Minze300 else MaterialTheme.colors.onSurfaceVariant,
+                    color = if (verbunden) F.textGreen else MaterialTheme.colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )

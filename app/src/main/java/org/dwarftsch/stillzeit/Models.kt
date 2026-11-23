@@ -1,13 +1,5 @@
 package org.dwarftsch.stillzeit
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.LocalDrink
-import androidx.compose.material.icons.filled.RiceBowl
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -15,7 +7,7 @@ import java.time.ZoneId
 
 /**
  * Art des Eintrags. [apiValue] ist exakt der String, den die API erwartet.
- * Die Farbzuordnung (Minze/Flieder/Grau/Honig) liegt im Theme (ui/Theme.kt).
+ * Die Farbpunkte je Art (Minze/Honig/Flieder) legt ui/HomeScreen.kt fest.
  */
 enum class Seite(val apiValue: String) {
     LINKS("Links"),
@@ -43,16 +35,6 @@ enum class Seite(val apiValue: String) {
             FLASCHE, WASSER -> "ml"
             BREI -> "g"
             else -> null
-        }
-
-    val icon: ImageVector
-        get() = when (this) {
-            LINKS -> Icons.Filled.ChevronLeft
-            RECHTS -> Icons.Filled.ChevronRight
-            BEIDSEITIG -> Icons.Filled.SwapHoriz
-            FLASCHE -> Icons.Filled.LocalDrink
-            BREI -> Icons.Filled.RiceBowl
-            WASSER -> Icons.Filled.WaterDrop
         }
 
     companion object {

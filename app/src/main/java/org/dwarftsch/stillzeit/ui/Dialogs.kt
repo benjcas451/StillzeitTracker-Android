@@ -1,24 +1,20 @@
 package org.dwarftsch.stillzeit.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,16 +24,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.dwarftsch.stillzeit.FlaschenArt
 import org.dwarftsch.stillzeit.Seite
 import java.time.LocalTime
 
-/**
- * Dialog für Menge und Inhalt eines Flaschen-Eintrags (neu oder bearbeiten).
- */
+// Dialoge nach Minze & Honig 2.0: neutrale Fläche, Titel H2, Felder mit
+// Label darüber, Aktionen als Text (Abbrechen leise, Löschen in Rot).
+
+/** Dialog für Menge und Inhalt eines Flaschen-Eintrags. */
 @Composable
 fun FlascheDialog(
-    bearbeiten: Boolean = false,
     initialMenge: Int? = null,
     initialFlaschenArt: FlaschenArt? = null,
     onAbbrechen: () -> Unit,
@@ -57,64 +54,38 @@ fun FlascheDialog(
     }
 
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onAbbrechen,
-        title = { Text(if (bearbeiten) "Flasche ändern" else "Flasche hinzufügen") },
+        title = { Text("Flasche ändern", style = MhTypo.h2) },
         text = {
-            Column {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    FlaschenArt.entries.forEachIndexed { index, art ->
-                        SegmentedButton(
-                            selected = flaschenArt == art,
-                            onClick = { flaschenArt = art },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = FlaschenArt.entries.size,
-                            ),
-                            colors = SegmentedButtonDefaults.colors(
-                                activeContainerColor = MaterialTheme.colorScheme.primary,
-                                activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                        ) {
-                            Text(art.apiValue)
+            Column(verticalArrangement = Arrangement.spacedBy(Mh.abstand4)) {
+                MhFeld("Art") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Mh.abstand2)) {
+                        FlaschenArt.entries.forEach { art ->
+                            MhAuswahl(
+                                text = art.apiValue,
+                                gewaehlt = flaschenArt == art,
+                                onClick = { flaschenArt = art },
+                                modifier = Modifier.widthIn(min = 72.dp),
+                            )
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = mengeText,
-                    onValueChange = { mengeText = it },
-                    shape = MaterialTheme.shapes.medium,
-                    colors = mhEingabefeldFarben(),
-                    label = { Text("Menge in ml") },
-                    suffix = { Text("ml") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                MengenFeld(mengeText, "ml") { mengeText = it }
             }
         },
-        confirmButton = {
-            Button(onClick = ::speichern, shape = MaterialTheme.shapes.medium) { Text("Speichern") }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onAbbrechen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Abbrechen") }
-        },
+        confirmButton = { MhTextButton("Speichern", ::speichern) },
+        dismissButton = { MhTextButton("Abbrechen", onAbbrechen, farbe = Mh.farben.textSecondary) },
     )
 }
 
 /**
- * Dialog für die Menge eines Brei-/Wasser-Eintrags (neu oder bearbeiten).
- * Wie der Flaschen-Dialog, nur ohne Pre/Mutter-Auswahl; die Einheit kommt
- * aus der Seite (Brei in g, Wasser in ml).
+ * Dialog für die Menge eines Brei-/Wasser-Eintrags. Wie der Flaschen-Dialog,
+ * nur ohne Pre/Mutter-Auswahl; die Einheit kommt aus der Seite (Brei in g,
+ * Wasser in ml).
  */
 @Composable
 fun MengeDialog(
     seite: Seite,
-    bearbeiten: Boolean = false,
     initialMenge: Int? = null,
     onAbbrechen: () -> Unit,
     onSpeichern: (menge: Int) -> Unit,
@@ -133,39 +104,18 @@ fun MengeDialog(
     }
 
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onAbbrechen,
-        title = { Text(if (bearbeiten) "Menge ändern" else "${seite.apiValue} hinzufügen") },
-        text = {
-            OutlinedTextField(
-                value = mengeText,
-                onValueChange = { mengeText = it },
-                shape = MaterialTheme.shapes.medium,
-                colors = mhEingabefeldFarben(),
-                label = { Text("Menge in $einheit") },
-                suffix = { Text(einheit) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            Button(onClick = ::speichern, shape = MaterialTheme.shapes.medium) { Text("Speichern") }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onAbbrechen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Abbrechen") }
-        },
+        title = { Text("${seite.apiValue}: Menge ändern", style = MhTypo.h2) },
+        text = { MengenFeld(mengeText, einheit) { mengeText = it } },
+        confirmButton = { MhTextButton("Speichern", ::speichern) },
+        dismissButton = { MhTextButton("Abbrechen", onAbbrechen, farbe = Mh.farben.textSecondary) },
     )
 }
 
-/** Dialog für die Dauer eines Still-Eintrags (neu oder bearbeiten). */
+/** Dialog für die Dauer eines Still-Eintrags. */
 @Composable
 fun DauerDialog(
     seite: Seite,
-    bearbeiten: Boolean = false,
     initialDauerMinuten: Int? = null,
     onAbbrechen: () -> Unit,
     onSpeichern: (dauerMinuten: Int) -> Unit,
@@ -183,35 +133,42 @@ fun DauerDialog(
     }
 
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onAbbrechen,
-        title = { Text(if (bearbeiten) "Dauer ändern" else "${seite.apiValue} hinzufügen") },
+        title = { Text("${seite.apiValue}: Dauer ändern", style = MhTypo.h2) },
         text = {
-            OutlinedTextField(
-                value = dauerText,
-                onValueChange = { dauerText = it },
-                shape = MaterialTheme.shapes.medium,
-                colors = mhEingabefeldFarben(),
-                label = { Text("Dauer") },
-                suffix = { Text("min") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            MhFeld("Dauer (Minuten)") {
+                ZahlenFeld(dauerText, "min") { dauerText = it }
+            }
         },
-        confirmButton = {
-            Button(onClick = ::speichern, shape = MaterialTheme.shapes.medium) { Text("Speichern") }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onAbbrechen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Abbrechen") }
-        },
+        confirmButton = { MhTextButton("Speichern", ::speichern) },
+        dismissButton = { MhTextButton("Abbrechen", onAbbrechen, farbe = Mh.farben.textSecondary) },
     )
 }
 
-/** Uhrzeit-Auswahl für die Schnell-Eingabe. */
+@Composable
+private fun MengenFeld(wert: String, einheit: String, onAenderung: (String) -> Unit) {
+    MhFeld("Menge ($einheit)") {
+        ZahlenFeld(wert, einheit, onAenderung)
+    }
+}
+
+/** Zahleneingabe mit Einheit rechts im Feld (Nebentextfarbe). */
+@Composable
+private fun ZahlenFeld(wert: String, einheit: String, onAenderung: (String) -> Unit) {
+    OutlinedTextField(
+        value = wert,
+        onValueChange = onAenderung,
+        suffix = { Text(einheit, style = MhTypo.body) },
+        singleLine = true,
+        textStyle = MhTypo.body,
+        colors = mhFeldFarben(),
+        shape = MhFeldForm,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** Uhrzeit-Auswahl für einen neuen Eintrag. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZeitDialog(
@@ -219,6 +176,7 @@ fun ZeitDialog(
     onAbbrechen: () -> Unit,
     onUebernehmen: (LocalTime) -> Unit,
 ) {
+    val f = Mh.farben
     val start = initial ?: LocalTime.now()
     val state = rememberTimePickerState(
         initialHour = start.hour,
@@ -226,24 +184,36 @@ fun ZeitDialog(
         is24Hour = true,
     )
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onAbbrechen,
-        title = { Text("Uhrzeit wählen") },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            Button(
-                onClick = { onUebernehmen(LocalTime.of(state.hour, state.minute)) },
-                shape = MaterialTheme.shapes.medium,
+        title = { Text("Uhrzeit wählen", style = MhTypo.h2) },
+        text = {
+            // Die großen Ziffern der Zeitauswahl dünn (400) wie alle großen
+            // Zahlen; Material nimmt dafür displayLarge.
+            MaterialTheme(
+                typography = MaterialTheme.typography.copy(
+                    displayLarge = MhTypo.number.copy(fontSize = 44.sp),
+                ),
             ) {
-                Text("Übernehmen")
+                TimePicker(
+                    state = state,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = f.surfaceSubtle,
+                        clockDialSelectedContentColor = f.onPrimary,
+                        clockDialUnselectedContentColor = f.text,
+                        selectorColor = f.primary,
+                        containerColor = f.surfaceRaised,
+                        timeSelectorSelectedContainerColor = f.selectedBg,
+                        timeSelectorUnselectedContainerColor = f.surfaceSubtle,
+                        timeSelectorSelectedContentColor = f.onSelected,
+                        timeSelectorUnselectedContentColor = f.text,
+                    ),
+                )
             }
         },
-        dismissButton = {
-            TextButton(
-                onClick = onAbbrechen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Abbrechen") }
+        confirmButton = {
+            MhTextButton("Übernehmen", { onUebernehmen(LocalTime.of(state.hour, state.minute)) })
         },
+        dismissButton = { MhTextButton("Abbrechen", onAbbrechen, farbe = Mh.farben.textSecondary) },
     )
 }
 
@@ -255,26 +225,11 @@ fun LoeschDialog(
     onLoeschen: () -> Unit,
 ) {
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onAbbrechen,
-        title = { Text("Eintrag löschen?") },
-        text = { Text(titel) },
-        confirmButton = {
-            Button(
-                onClick = onLoeschen,
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-            ) { Text("Löschen") }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onAbbrechen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Abbrechen") }
-        },
+        title = { Text("Eintrag löschen", style = MhTypo.h2) },
+        text = { Text(titel, style = MhTypo.body) },
+        confirmButton = { MhLoeschenButton("Löschen", onLoeschen) },
+        dismissButton = { MhTextButton("Abbrechen", onAbbrechen, farbe = Mh.farben.textSecondary) },
     )
 }
 
@@ -286,19 +241,13 @@ fun InfoDialog(
     onSchliessen: () -> Unit,
 ) {
     AlertDialog(
-        shape = MaterialTheme.shapes.extraLarge,
         onDismissRequest = onSchliessen,
-        title = { Text(titel) },
+        title = { Text(titel, style = MhTypo.h2) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(text)
+                Text(text, style = MhTypo.small)
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = onSchliessen,
-                colors = ButtonDefaults.textButtonColors(contentColor = MinzeHonig.farben.gruenText),
-            ) { Text("Schließen") }
-        },
+        confirmButton = { MhTextButton("Schließen", onSchliessen) },
     )
 }
