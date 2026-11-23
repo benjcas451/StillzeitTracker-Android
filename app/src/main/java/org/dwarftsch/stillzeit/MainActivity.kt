@@ -13,14 +13,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.dwarftsch.stillzeit.ui.HomeScreen
 import org.dwarftsch.stillzeit.ui.HomeViewModel
 import org.dwarftsch.stillzeit.ui.SettingsScreen
-import org.dwarftsch.stillzeit.ui.StillzeitTheme
+import org.dwarftsch.stillzeit.ui.MhTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            StillzeitTheme {
+            MhTheme {
                 val viewModel: HomeViewModel = viewModel()
                 var zeigeEinstellungen by remember { mutableStateOf(false) }
 
